@@ -1,0 +1,184 @@
+/* ==========================================================================
+   LEGENDS SETTINGS / COLOR LEGEND (update 24, layout options extended in update 31) - shared by every word game.
+   The legend is built by /shared/legend.js. Everything that can be customised is driven by CSS
+   variables set on the section (--lg-scale, --lg-chip, --lg-row-gap, --lg-col-gap, --lg-cols, --lg-rows, --lg-jc, --lg-font),
+   so it re-flows instantly with no new round.
+   Layout rules: the legend is a normal block in the page flow (never absolutely positioned), so it
+   can never overlap the floating message window, the keyboard or the guess board - the board
+   simply gets whatever height is left (the games re-measure on every legend change).
+   ========================================================================== */
+.lgSection {
+  --lg-scale: 1;
+  --lg-chip: 1;
+  --lg-row-gap: 6px;
+  --lg-col-gap: 10px;
+  --lg-jc: center;
+  --lg-fit: 1;
+  box-sizing: border-box;
+  position: relative;
+  flex-shrink: 0;
+  width: 100%;
+  max-width: 640px;
+  margin: 4px auto 6px;
+  padding: calc(5px * var(--lg-scale) * var(--lg-fit)) calc(8px * var(--lg-scale) * var(--lg-fit));
+  font-family: var(--lg-font, inherit);
+  font-size: calc(12px * var(--lg-scale) * var(--lg-fit));
+  line-height: 1.2;
+  color: var(--text, var(--paper, #e8e9f5));
+  text-align: center;
+  overflow: hidden;
+}
+.lgSection[hidden] { display: none !important; }
+.lgSection.lgPanel {
+  background: var(--lg-panel-bg, rgba(127, 127, 160, 0.10));
+  border: 1px solid var(--lg-panel-border, rgba(127, 127, 160, 0.28));
+  border-radius: 12px;
+}
+.lgSection.lgAlignLeft { text-align: left; }
+.lgSection.lgAlignRight { text-align: right; }
+
+.lgTitle {
+  font-weight: 800;
+  font-size: 0.92em;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.8;
+  margin: 0 0 calc(4px * var(--lg-scale) * var(--lg-fit));
+}
+
+.lgList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  /* Automatic layout: as many columns as fit (each at least ~150px at 100% size), so a phone shows
+     two short columns instead of one tall stack. Rows/Columns in the settings override this. */
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(150px * var(--lg-scale) * var(--lg-fit))), 1fr));
+  gap: calc(var(--lg-row-gap) * var(--lg-scale) * var(--lg-fit)) calc(var(--lg-col-gap) * var(--lg-scale) * var(--lg-fit));
+  justify-items: start;
+  align-items: center;
+}
+.lgAlignCenter .lgList { justify-items: start; }
+.lgAlignRight .lgList { justify-items: end; }
+
+/* Exact grid (update 31). legend.js works out the real number of rows and columns for the entries that show and
+   sets --lg-rows / --lg-cols, so "2 rows x 3 columns" is always exactly 2 x 3 (extra entries add rows/columns
+   or are hidden, as the host chose).  Fill order: across (row by row) or down (column by column). */
+.lgSection.lgFixed .lgList { grid-template-columns: repeat(var(--lg-cols), minmax(0, 1fr)); }
+.lgSection.lgFixed.lgFlowCol .lgList {
+  grid-auto-flow: column;
+  grid-template-rows: repeat(var(--lg-rows), auto);
+}
+/* Compact cells: every cell is only as wide as its entry, and the whole block follows Alignment */
+.lgSection.lgFixed.lgFit-content .lgList {
+  grid-template-columns: repeat(var(--lg-cols), minmax(0, max-content));
+  justify-content: var(--lg-jc);
+}
+.lgSection.lgAuto.lgFit-content .lgList {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: var(--lg-jc);
+}
+/* Where each entry sits inside its cell (default "same as Alignment" = the rules above) */
+.lgCell-start .lgList { justify-items: start; }
+.lgCell-center .lgList { justify-items: center; }
+.lgCell-end .lgList { justify-items: end; }
+
+.lgItem {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(5px * var(--lg-scale) * var(--lg-fit));
+  min-width: 0;
+  max-width: 100%;
+}
+.lgText {
+  font-weight: 700;
+  font-size: 1em;
+  min-width: 0;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.lgText b { font-weight: 800; }
+
+/* How each entry is built: chip then text (default), text then chip, or chip above the text */
+.lgIL-rev .lgItem { flex-direction: row-reverse; }
+.lgIL-rev .lgText { text-align: right; }
+.lgIL-stack .lgItem { flex-direction: column; gap: calc(3px * var(--lg-scale) * var(--lg-fit)); }
+.lgIL-stack .lgText { text-align: center; }
+
+.lgChip {
+  --lg-bg: #888;
+  --lg-fg: #fff;
+  --lg-bd: rgba(0, 0, 0, 0.35);
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: calc(22px * var(--lg-scale) * var(--lg-chip) * var(--lg-fit));
+  height: calc(22px * var(--lg-scale) * var(--lg-chip) * var(--lg-fit));
+  padding: 0 calc(5px * var(--lg-scale) * var(--lg-chip) * var(--lg-fit));
+  font-weight: 800;
+  font-size: calc(12px * var(--lg-scale) * var(--lg-chip) * var(--lg-fit));
+  line-height: 1;
+  white-space: nowrap;
+  background: var(--lg-bg);
+  color: var(--lg-fg);
+  border: 1px solid var(--lg-bd);
+  box-shadow: inset 0 -3px 0 var(--lg-bd);
+  border-radius: 6px;
+}
+.lgChip svg { width: 1.25em; height: 1.25em; display: block; stroke: currentColor; fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.lgShape-square .lgChip { border-radius: 2px; }
+.lgShape-rounded .lgChip { border-radius: 6px; }
+.lgShape-circle .lgChip { border-radius: 999px; min-width: calc(22px * var(--lg-scale) * var(--lg-chip) * var(--lg-fit)); padding: 0; }
+.lgShape-bar .lgChip { border-radius: 4px; min-width: calc(40px * var(--lg-scale) * var(--lg-chip) * var(--lg-fit)); }
+.lgChip:empty { padding: 0; }
+
+/* ---------------------------------------------------------------- settings panel */
+.lgPanelUI { text-align: left; font-size: 13px; }
+.lgPanelUI .lgRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 8px; }
+.lgPanelUI .lgRow > label { font-size: 12px; opacity: 0.8; min-width: 92px; }
+.lgPanelUI input[type="text"], .lgPanelUI select {
+  flex: 1 1 120px; min-width: 0; padding: 6px 8px; font: inherit; font-size: 13px;
+  color: inherit; background: rgba(127, 127, 150, 0.14);
+  border: 1px solid rgba(127, 127, 150, 0.4); border-radius: 8px;
+}
+.lgPanelUI select option { color: #111; background: #fff; }
+.lgPanelUI input[type="range"] { flex: 1 1 120px; min-width: 0; }
+.lgPanelUI .lgVal { min-width: 44px; text-align: right; font-size: 12px; opacity: 0.8; }
+.lgPanelUI .lgCheck { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; cursor: pointer; }
+.lgPanelUI .lgCheck input { width: 18px; height: 18px; }
+.lgPanelUI .lgPresets { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+.lgPanelUI .lgPresets .lgBtn { padding: 5px 10px; font-size: 12px; }
+.lgPanelUI .lgPresets .lgBtn.on { background: rgba(127, 127, 160, 0.35); border-color: currentColor; }
+.lgPanelUI .lgHelp { margin: 0 0 8px; font-size: 11.5px; line-height: 1.4; opacity: 0.7; }
+.lgPanelUI .lgInfo {
+  margin: 0 0 8px; padding: 7px 9px; font-size: 12px; font-weight: 700; line-height: 1.35;
+  background: rgba(127, 127, 160, 0.14); border-radius: 8px;
+}
+.lgPanelUI h5 { margin: 12px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.75; }
+.lgPanelUI button.lgBtn {
+  padding: 7px 12px; font: inherit; font-weight: 700; font-size: 12.5px; cursor: pointer;
+  color: inherit; background: transparent; border: 1.5px solid rgba(127, 127, 150, 0.5); border-radius: 9px;
+}
+.lgPanelUI button.lgBtn:hover { background: rgba(127, 127, 150, 0.18); }
+.lgPanelUI button.lgBtn:disabled { opacity: 0.35; cursor: default; }
+.lgItems { list-style: none; margin: 0 0 8px; padding: 0; }
+.lgEdit {
+  display: grid; grid-template-columns: auto auto auto 54px 1fr auto auto; gap: 6px; align-items: center;
+  padding: 6px; margin: 0 0 6px; border: 1px solid rgba(127, 127, 150, 0.3); border-radius: 10px;
+  background: rgba(127, 127, 150, 0.07);
+}
+.lgEdit.off { opacity: 0.5; }
+.lgEdit input[type="text"] { padding: 5px 6px; min-width: 0; width: 100%; }
+.lgEdit input[type="color"] { width: 30px; height: 28px; padding: 0; border: 1px solid rgba(127, 127, 150, 0.5); border-radius: 6px; background: none; cursor: pointer; }
+.lgEdit .lgMini {
+  width: 26px; height: 28px; padding: 0; font-size: 13px; line-height: 1; cursor: pointer; color: inherit;
+  background: transparent; border: 1px solid rgba(127, 127, 150, 0.45); border-radius: 6px;
+}
+.lgEdit .lgMini:disabled { opacity: 0.3; cursor: default; }
+@media (max-width: 460px) {
+  .lgEdit { grid-template-columns: auto auto auto 48px 1fr; }
+  .lgEdit input[type="color"], .lgEdit .lgDel { justify-self: start; }
+}

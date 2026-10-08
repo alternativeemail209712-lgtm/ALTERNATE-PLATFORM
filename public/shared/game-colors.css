@@ -1,0 +1,63 @@
+/* ==========================================================================
+   STRONG GAME COLORS - loaded after every game's own stylesheet.
+   Replaces the soft/pastel green, yellow and red on letter tiles, number
+   columns/badges and keyboards with solid, saturated, high-contrast shades.
+   Change the three variables below to retune all five games at once.
+   ========================================================================== */
+:root{
+  --strong-green:  #0E9F45;  --strong-green-dark:  #087A32;
+  --strong-yellow: #FFC400;  --strong-yellow-dark: #D9A100;
+  --strong-red:    #E11D2E;  --strong-red-dark:    #B3101F;
+  --strong-grey:   #4A4F66;
+}
+
+/* ---- BLINDLE / ORACLE / COLORBLINDLE / TWISTLE: tiles, keys, legend ---- */
+.tile.filled.correct, .key.correct, .legendTile.correct{
+  background: var(--strong-green); color: var(--strong-green-ink, #fff); border-color: var(--strong-green-dark);
+  box-shadow: inset 0 -3px 0 var(--strong-green-dark);
+}
+.tile.filled.present, .key.present, .legendTile.present{
+  background: var(--strong-yellow); color: var(--strong-yellow-ink, #241a00); border-color: var(--strong-yellow-dark);
+  box-shadow: inset 0 -3px 0 var(--strong-yellow-dark);
+}
+.tile.filled.absent, .key.absent, .legendTile.absent{
+  background: var(--strong-red); color: var(--strong-red-ink, #fff); border-color: var(--strong-red-dark);
+  box-shadow: inset 0 -3px 0 var(--strong-red-dark);
+}
+.tile.filled.correct, .tile.filled.present, .tile.filled.absent{ font-weight: 800; }
+.key.correct, .key.present, .key.absent{ font-weight: 800; }
+
+/* ---- ORACLE number columns / count badges ---- */
+.countBadge.green{ background: var(--strong-green);  color: var(--strong-green-ink, #fff);     border-color: var(--strong-green-dark); }
+.countBadge.gold{  background: var(--strong-yellow); color: var(--strong-yellow-ink, #241a00);  border-color: var(--strong-yellow-dark); }
+.countBadge.red{   background: var(--strong-red);    color: var(--strong-red-ink, #fff);     border-color: var(--strong-red-dark); }
+.countBadge.green, .countBadge.gold, .countBadge.red{ font-weight: 800; }
+
+/* ---- COLORBLINDLE: color-count squares, keyboard colors, hit/miss ---- */
+:root{
+  --cb-red:    #E11D2E;
+  --cb-blue:   #1E73E8;
+  --cb-yellow: #FFC400;
+  --cb-purple: #7B3FE4;
+  --cb-hit:    #0E9F45;
+  --cb-miss:   #8B8F9E;
+}
+.key.c-red, .legendSwatch.c-red{ color: var(--cb-red-ink, #fff); }
+.key.c-blue, .legendSwatch.c-blue{ color: var(--cb-blue-ink, #fff); }
+.key.c-purple, .legendSwatch.c-purple{ color: var(--cb-purple-ink, #fff); }
+.key.c-yellow, .legendSwatch.c-yellow{ color: var(--cb-yellow-ink, #241a00); }
+.tile.filled.hit,  .legendTile.hit{  background: var(--cb-hit);  color: var(--cb-hit-ink, #fff); font-weight:800; }
+.tile.filled.miss, .legendTile.miss{ background: var(--cb-miss); color: var(--cb-miss-ink, #fff); font-weight:800; }
+
+/* ---- CROSSDLE: tiles, keyboard, chips ---- */
+:root{
+  --green:  #0E9F45;  --green-glow:  rgba(14,159,69,.55);
+  --yellow: #FFC400;  --yellow-glow: rgba(255,196,0,.55);
+  --grey:   #4A4F66;
+}
+.tile-green,  .key-green,  .chip-green { background: var(--strong-green);  color: var(--strong-green-ink, #fff);    box-shadow: inset 0 -3px 0 var(--strong-green-dark),  0 2px 8px var(--green-glow); }
+.tile-yellow, .key-yellow, .chip-yellow{ background: var(--strong-yellow); color: var(--strong-yellow-ink, #241a00); box-shadow: inset 0 -3px 0 var(--strong-yellow-dark), 0 2px 8px var(--yellow-glow); }
+.tile-grey,   .key-grey,   .chip-grey  { background: var(--strong-grey);   color: var(--strong-grey-ink, #fff);    box-shadow: inset 0 -3px 0 rgba(0,0,0,.28); }
+.tile-green, .tile-yellow, .tile-grey, .key-green, .key-yellow, .key-grey{ font-weight: 800; }
+.hl-green{ color: var(--strong-green-dark); }
+.hl-yellow{ color: #A67C00; }

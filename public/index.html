@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>Live Game Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Baloo+2:wght@600;700;800&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared/theme.css" />
+<script src="/shared/theme.js"></script>
+<link rel="stylesheet" href="/home.css" />
+<link rel="stylesheet" href="/home-views.css" />
+<style>
+  :root{
+    /* Base surface tokens now come from the shared theme system
+       (/shared/theme.css) so the dropdown below can swap the platform's
+       main color away from cream. These three lines are the only ones
+       that change when a theme is picked. */
+    --cream:var(--theme-bg); --cream-deep:var(--theme-bg-deep); --linen:var(--theme-card);
+    --wood:var(--theme-deep); --wood-deep:var(--theme-deep); --thread:var(--theme-line);
+    --ink:var(--theme-ink); --ink-mid:#9C8367;
+    /* Fixed accent colors — deliberately saturated ("yarn ball" strength,
+       not pastel-washed) so badges/icons/tags read as bold craft color
+       rather than a tint of the background. */
+    --pink:#E0699C; --pink-deep:#A8446F;
+    --blue:#4FA0C4; --blue-deep:#2C7594;
+    --green:#6FAA5C; --green-deep:#4B7D3C;
+    --yellow:#E0A934; --yellow-deep:#A8790F;
+    --purple:#9C6FD1; --purple-deep:#6C459E;
+    --coral:#E0724A; --coral-deep:#A84B26;
+    --font-head:"Fredoka","Baloo 2",cursive; --font-body:"Quicksand",sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh;
+    background:
+      radial-gradient(circle at 6% 10%, rgba(169,211,236,.55) 0%, transparent 34%),
+      radial-gradient(circle at 94% 6%, rgba(243,183,198,.55) 0%, transparent 32%),
+      radial-gradient(circle at 90% 92%, rgba(184,222,174,.55) 0%, transparent 36%),
+      radial-gradient(circle at 4% 94%, rgba(211,191,236,.55) 0%, transparent 34%),
+      radial-gradient(circle at 50% 45%, rgba(246,212,134,.30) 0%, transparent 46%),
+      linear-gradient(180deg, var(--cream) 0%, var(--cream-deep) 100%);
+    color:var(--ink); font-family:var(--font-body);
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .hub{ width:100%; max-width:480px; position:relative; }
+
+  .top-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+  .top-tools{ display:flex; align-items:center; gap:8px; margin-left:auto; }
+  .hub-badge{
+    display:inline-flex; align-items:center; gap:6px; min-width:0; max-width:100%;
+    font-family:var(--font-head); font-weight:600; font-size:12.5px;
+    letter-spacing:.04em; color:#fff; background:var(--coral-deep);
+    padding:7px 14px; border-radius:999px; margin:0;
+    box-shadow:inset 0 1.5px 0 rgba(255,255,255,.35), 0 4px 0 #7A331A, 0 7px 12px rgba(122,51,26,.25);
+    border:2px dashed rgba(255,255,255,.6);
+    transition:opacity .25s ease;
+  }
+  /* (update 30) While a TikTok host is connected the banner reads "<HOST NAME> LIVE GAMES" with the host's
+     round TikTok picture on the left, inside the banner. Without a host it is the plain "TIKTOK LIVE GAMES". */
+  .hub-badge.has-host{ padding:4px 15px 4px 4px; gap:9px; font-size:13px; }
+  .hub-badge.is-swapping{ opacity:0; }
+  .hb-avatar{
+    flex:0 0 auto; position:relative; width:36px; height:36px; border-radius:50%; overflow:hidden;
+    display:inline-flex; align-items:center; justify-content:center;
+    background:#7A331A; border:2px solid #fff; box-shadow:0 2px 0 rgba(0,0,0,.25);
+  }
+  .hb-avatar[hidden]{ display:none; }
+  .hb-avatar img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; border-radius:50%; display:block; }
+  .hb-initial{ font-size:15px; font-weight:700; color:#fff; line-height:1; }
+  .hb-emoji[hidden], .hb-name[hidden]{ display:none; }
+  .hb-name{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-transform:uppercase; }
+  .hb-label{ flex:0 0 auto; white-space:nowrap; }
+  h1{
+    font-family:var(--font-head); font-weight:600; font-size:32px; margin:0 0 8px;
+    color:var(--wood-deep);
+    text-shadow:0 2px 0 #fff, 0 4px 0 rgba(139,90,52,.18);
+  }
+  h1 .pop-blue{color:var(--blue-deep);}
+  h1 .pop-pink{color:var(--pink-deep);}
+  .hub-sub{ color:var(--ink-mid); font-size:14.5px; line-height:1.6; margin:0 0 18px; font-weight:500; }
+
+  /* Little colored-chip feature strip, echoing a "5 subjects" style row */
+  .feature-strip{ display:flex; gap:8px; margin-bottom:26px; flex-wrap:wrap; }
+  .feature-chip{
+    flex:1; min-width:78px; text-align:center;
+    background:var(--linen); border:2px dashed var(--thread); border-radius:16px;
+    padding:10px 6px 9px;
+    box-shadow:0 3px 0 rgba(139,90,52,.08);
+  }
+  .feature-chip .fc-icon{
+    width:36px; height:36px; margin:0 auto 5px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; font-size:16px;
+    border:2px solid rgba(255,255,255,.55);
+    box-shadow:inset 0 2px 2px rgba(255,255,255,.5), inset 0 -4px 5px rgba(0,0,0,.14), 0 3px 0 var(--chip-deep, rgba(0,0,0,.18));
+  }
+  .feature-chip .fc-label{ font-size:10px; font-weight:700; color:var(--ink-mid); letter-spacing:.02em; }
+  .fc-1 .fc-icon{ background:var(--blue); --chip-deep:var(--blue-deep); } .fc-2 .fc-icon{ background:var(--yellow); --chip-deep:var(--yellow-deep); }
+  .fc-3 .fc-icon{ background:var(--green); --chip-deep:var(--green-deep); } .fc-4 .fc-icon{ background:var(--pink); --chip-deep:var(--pink-deep); }
+  .fc-5 .fc-icon{ background:var(--purple); --chip-deep:var(--purple-deep); }
+
+  .game-card{
+    display:block; text-decoration:none; color:inherit; position:relative;
+    /* (update 30) every --cu-* variable below is set from the HOME page's "Customize cards" panel
+       (public/home.js); when a variable is not set the original look is used. */
+    background:var(--cu-bg, var(--linen));
+    border:var(--cu-bw, 3px) var(--cu-bs, dashed) var(--cu-border, var(--accent, var(--thread)));
+    border-radius:var(--cu-radius, 22px);
+    padding:20px; margin-bottom:max(16px, calc(var(--cu-depth, 7px) + 12px)); overflow:hidden;
+    box-shadow:inset 0 2px 0 rgba(255,255,255,.6), 0 var(--cu-depth, 7px) 0 var(--cu-edge, var(--accent-deep, rgba(139,90,52,.18))), 0 14px 22px rgba(139,90,52,.16);
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .game-card[hidden]{ display:none; }
+  .game-card::before{
+    content:""; position:absolute; top:-34px; right:-34px; width:120px; height:120px;
+    border-radius:50%; background:var(--cu-blob, var(--accent-soft, var(--yellow))); opacity:.4;
+  }
+  .game-card:active{ transform:translateY(4px); box-shadow:inset 0 2px 0 rgba(255,255,255,.5), 0 2px 0 var(--cu-edge, var(--accent-deep, rgba(139,90,52,.18))); }
+  .game-icon{
+    position:relative; z-index:1;
+    font-size:26px; margin-bottom:8px; display:inline-flex; align-items:center; justify-content:center;
+    width:50px; height:50px; border-radius:50%; background:var(--cu-icon, var(--accent-soft, var(--yellow)));
+    border:3px solid var(--cu-bg, var(--linen));
+    box-shadow:inset 0 2px 3px rgba(255,255,255,.55), inset 0 -5px 6px rgba(0,0,0,.14), 0 4px 0 var(--cu-iconedge, var(--accent-deep, var(--yellow-deep)));
+  }
+  .game-name{ position:relative; z-index:1; font-family:var(--font-head); font-weight:600; font-size:20px; margin:10px 0 4px; color:var(--cu-title, var(--accent-deep, var(--ink))); font-family:var(--cu-font, var(--font-head)); }
+  .game-desc{ position:relative; z-index:1; color:var(--ink-mid); font-size:13.5px; line-height:1.55; margin:0 0 14px; font-weight:500; }
+  .game-desc{ color:var(--cu-text, var(--ink-mid)); }
+  .game-tags{ position:relative; z-index:1; display:flex; gap:6px; flex-wrap:wrap; }
+  .tag{
+    font-size:11px; font-weight:700; padding:4px 11px; border-radius:999px;
+    color:#fff; box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 2px 0 var(--tag-deep, rgba(0,0,0,.15));
+  }
+  .tag-a{ background:var(--cu-tag, var(--blue)); --tag-deep:var(--cu-tagedge, var(--blue-deep)); }
+  .tag-b{ background:var(--cu-tag, var(--pink)); --tag-deep:var(--cu-tagedge, var(--pink-deep)); }
+  .tag-c{ background:var(--cu-tag, var(--green)); --tag-deep:var(--cu-tagedge, var(--green-deep)); }
+  .tag-d{ background:var(--cu-tag, var(--purple)); --tag-deep:var(--cu-tagedge, var(--purple-deep)); }
+  .play-row{ position:relative; z-index:1; display:flex; align-items:center; justify-content:space-between; margin-top:16px; }
+  .play-cta{
+    font-family:var(--cu-font, var(--font-head)); font-weight:600; font-size:14px;
+    color:var(--cu-cta, var(--accent-deep, var(--wood-deep)));
+  }
+  .flagle-card{ --accent:var(--blue); --accent-soft:var(--blue); --accent-deep:var(--blue-deep); }
+  .travle-card{ --accent:var(--purple); --accent-soft:var(--purple); --accent-deep:var(--purple-deep); }
+  .blindle-card{ --accent:var(--yellow); --accent-soft:var(--yellow); --accent-deep:var(--yellow-deep); }
+  .findle-card{ --accent:var(--green); --accent-soft:var(--green); --accent-deep:var(--green-deep); }
+  .crossdle-card{ --accent:var(--coral); --accent-soft:var(--coral); --accent-deep:var(--coral-deep); }
+  .twistle-card{ --accent:var(--pink); --accent-soft:var(--pink); --accent-deep:var(--pink-deep); }
+  .structle-card{ --accent:#D9822B; --accent-soft:#D9822B; --accent-deep:#A85F14; }
+  .textle-card{ --accent:#0E9F45; --accent-soft:#0E9F45; --accent-deep:#087A32; }
+  .shapedle-card{ --accent:#F2799F; --accent-soft:#F2799F; --accent-deep:#C94A77; }
+  .codedle-card{ --accent:#E0699C; --accent-soft:#E0699C; --accent-deep:#B8457A; }
+  .rangedle-card{ --accent:#7B3FE4; --accent-soft:#7B3FE4; --accent-deep:#5A25B8; }
+  .colordle-card{ --accent:#2F9E8F; --accent-soft:#2F9E8F; --accent-deep:#1F7A6E; }
+  .colorblindle-card{ --accent:var(--coral); --accent-soft:var(--coral); --accent-deep:var(--coral-deep); }
+  .oracle-card{ --accent:var(--purple); --accent-soft:var(--purple); --accent-deep:var(--purple-deep); }
+  .hub-footer{ text-align:center; color:var(--ink-mid); font-size:12px; margin-top:24px; line-height:1.7; font-weight:500; }
+</style>
+</head>
+<body>
+  <div class="hub">
+    <div class="top-row">
+      <!-- (update 30) Shows "<HOST NAME> LIVE GAMES" + the host's round TikTok picture while a host is
+           connected (filled in by /home.js); otherwise the original "TIKTOK LIVE GAMES". -->
+      <div class="hub-badge" id="hubBadge" aria-live="polite">
+        <span class="hb-avatar" id="hbAvatar" hidden><img id="hbImg" alt="" hidden /><span class="hb-initial" id="hbInitial"></span></span>
+        <span class="hb-emoji" id="hbEmoji">🧶</span>
+        <span class="hb-name" id="hbName" hidden></span>
+        <span class="hb-label" id="hbLabel">TIKTOK LIVE GAMES</span>
+      </div>
+      <div class="top-tools">
+        <button type="button" class="cu-open" id="cuOpen" aria-label="Customize game cards" title="Customize game cards">🎛️</button>
+        <label class="theme-picker">
+          🎨
+          <select data-theme-select aria-label="Platform theme color">
+            <option value="cream">Cream</option>
+            <option value="blue">Sky Blue</option>
+            <option value="green">Meadow Green</option>
+            <option value="pink">Blossom Pink</option>
+            <option value="violet">Lavender Violet</option>
+            <option value="honey">Honey Gold</option>
+          </select>
+        </label>
+      </div>
+    </div>
+    <h1>Choose a <span class="pop-blue">game</span></h1>
+    <p class="hub-sub">Each game reads your TikTok LIVE chat directly — audience comments become guesses automatically. Pick one to open its own control board.</p>
+
+    <div class="feature-strip">
+      <div class="feature-chip fc-1"><div class="fc-icon">📡</div><div class="fc-label">LIVE CHAT</div></div>
+      <div class="feature-chip fc-2"><div class="fc-icon">🧪</div><div class="fc-label">TEST MODE</div></div>
+      <div class="feature-chip fc-3"><div class="fc-icon">🎮</div><div class="fc-label">OFFLINE</div></div>
+      <div class="feature-chip fc-4"><div class="fc-icon">🏆</div><div class="fc-label">LEADERBOARD</div></div>
+      <div class="feature-chip fc-5"><div class="fc-icon">🎁</div><div class="fc-label">GIFTS</div></div>
+    </div>
+
+    <a class="game-card flagle-card" data-game="flagle" href="/flagle/">
+      <span class="game-icon">🚩</span>
+      <div class="game-name">FLAGLE live</div>
+      <p class="game-desc">Guess the blurred flag before time runs out. Distance-and-direction hints, a live top-10 ticker, top likes &amp; gifters, and a host hint button.</p>
+      <div class="game-tags">
+        <span class="tag tag-a">Live · Test · Offline</span>
+        <span class="tag tag-b">198 countries</span>
+      </div>
+      <div class="play-row"><span></span><span class="play-cta">Play FLAGLE →</span></div>
+    </a>
+
+    <a class="game-card travle-card" data-game="travle" href="/travle/">
+      <span class="game-icon">🌍</span>
+      <div class="game-name">TRAVLE live</div>
+      <p class="game-desc">Chat builds a land-border chain between two random countries on an interactive rotating globe. No guess limit — free outline and initial hints.</p>
+      <div class="game-tags">
+        <span class="tag tag-d">Live · Test · Offline</span>
+        <span class="tag tag-c">Draggable 3D globe</span>
+      </div>
+      <div class="play-row"><span></span><span class="play-cta">Play TRAVLE →</span></div>
+    </a>
+
+    <a class="game-card blindle-card" data-game="blindle" href="/blindle/">
+      <span class="game-icon">🔤</span>
+      <div class="game-name">BLINDLE</div>
+      <p class="game-desc">Chat deduces a hidden word (4-20 letters) from green/yellow/red count clues alone — no letter positions ever shown directly. Unlimited guesses, host-tunable difficulty.</p>
+      <div class="game-tags">
+        <span class="tag tag-c">Live · Test · Offline</span>
+        <span class="tag tag-a">370,000+ word dictionary</span>
+      </div>
+      <div class="play-row"><span></span><span class="play-cta">Play BLINDLE →</span></div>
+    </a>
+
+    <a class="game-card findle-card" data-game="findle" href="/findle">
+      <span class="game-icon">🔍</span>
+      <div class="game-name">FINDLE live</div>
+      <p class="game-desc">A themed word-search grid — chat calls out hidden words as they spot them. Combos reward quick streaks, and a shared letter only clears once every word using it is found.</p>
+      <div class="game-tags">
+        <span class="tag tag-c">Live · Test</span>
+        <span class="tag tag-b">Combo multipliers</span>
+      </div>
+      <div class="play-row"><span></span><span class="play-cta">Play FINDLE →</span></div>
+    </a>
+
+    <a class="game-card crossdle-card" data-game="crossdle" href="/crossdle/">
+      <span class="game-icon">✦</span>
+      <div class="game-name">CROSSDLE live</div>
+      <p class="game-desc">An "ambiguous Wordle" — every guess is scored against the real answer AND a fresh decoy word, so a green tile is a clue, never a certainty. Unlimited guesses, no clock.</p>
+      <div class="game-tags">
+        <span class="tag tag-d">Live · Test · Offline</span>
+        <span class="tag tag-a">Decoy-word twist</span>
+      </div>
+      <div class="play-row"><span></span><span class="play-cta">Play CROSSDLE →</span></div>
+    </a>
+
+    <a class="game-card twistle-card" data-game="twistle" href="/twistle/">
+      <span class="game-icon">🌀</span>
+      <div class="game-name">TWISTLE live</div>
+      <p class="game-desc">Chat guesses a hidden word using 3 mystery symbols instead of colors — each secretly means "right spot", "wrong spot", or "not in your guess", and nobody's told which. Same word bank, difficulty, and scoring as BLINDLE.</p>
+      <div class="game-tags">
+        <span class="tag tag-b">Live · Test · Offline</span>
+        <span class="tag tag-c">Mystery symbol clues</span>
+      </div>
+      <div class="play-row"><span></span><span class="play-cta">Play TWISTLE →</span></div>
+    </a>
+
+    <a class="game-card oracle-card" data-game="oracle" href="/oracle/">
+      <span class="game-icon">🔮</span>
+      <div class="game-name">ORACLE</div>
+      <p class="game-desc">BLINDLE with a twist — the three number columns are shuffled every round and stay uncolored. Chat must work out which column is green, yellow and red; the colors are only revealed once the word is found.</p>
+      <div class="game-tags">
+        <span class="tag tag-d">Live · Test · Offline</span>
+        <span class="tag tag-b">Shuffled hidden columns</span>
+      </div>
+      <div class="play-row"><span></span><span class="play-cta">Play ORACLE →</span></div>
+    </a>
+
+    <a class="game-card colorblindle-card" data-game="colorblindle" href="/colorblindle/">
+      <span class="game-icon">🎨</span>
+      <div class="game-name">COLORBLINDLE</div>
+      <p class="game-desc">Every letter on the keyboard secretly has one of four colors — reshuffled every round. Chat is told how many letters of each color are in the hidden word, then guesses; tiles turn green (correct) or gray (incorrect).</p>
+      <div class="game-tags">
+        <span class="tag tag-d">Live · Test · Offline</span>
+        <span class="tag tag-b">Shuffled keyboard colors</span>
+      </div>
+      <div class="play-row"><span></span><span class="play-cta">Play COLORBLINDLE →</span></div>
+    </a>
+
+    <a class="game-card colordle-card" data-game="colordle" href="/colordle/">
+      <span class="game-icon">🟥</span>
+      <div class="game-name">COLORDLE</div>
+      <p class="game-desc">Every key on the keyboard wears one of four colors — reshuffled every round. The hidden word is shown as empty colored boxes; chat matches each box to the keyboard colors and guesses. Tiles turn green (correct) or gray (incorrect).</p>
+      <div class="game-tags">
+        <span class="tag tag-d">Live · Test · Offline</span>
+        <span class="tag tag-b">Colored empty boxes</span>
+      </div>
+      <div class="play-row"><span></span><span class="play-cta">Play COLORDLE →</span></div>
+    </a>
+
+    <a class="game-card structle-card" data-game="structle" href="/structle/">
+      <span class="game-icon">📐</span>
+      <div class="game-name">STRUCTLE</div>
+      <p class="game-desc">Every letter is made of straight lines and curves. Each guess shows how far its total straight lines and total curves are from the hidden word's. Chat wins the moment both numbers hit zero — any word with the exact same totals counts.</p>
+      <div class="game-tags">
+        <span class="tag tag-d">Live · Test · Offline</span>
+        <span class="tag tag-b">Straight lines &amp; curves</span>
+      </div>
+      <div class="play-row"><span></span><span class="play-cta">Play STRUCTLE →</span></div>
+    </a>
+
+    <a class="game-card textle-card" data-game="textle" href="/textle/">
+      <span class="game-icon">🧩</span>
+      <div class="game-name">TEXTLE</div>
+      <p class="game-desc">Every guess is cut into colored segments: green letters match in the right order, yellow letters must be rearranged, gray letters aren't in the word. Green segments at the edges get rounded ends. The keyboard colors itself. Hidden words run 4–15 letters (up to 20 in Settings).</p>
+      <div class="game-tags">
+        <span class="tag tag-d">Live · Test · Offline</span>
+        <span class="tag tag-b">Green · yellow · gray segments</span>
+      </div>
+      <div class="play-row"><span></span><span class="play-cta">Play TEXTLE →</span></div>
+    </a>
+
+    <a class="game-card rangedle-card" data-game="rangedle" href="/rangedle/">
+      <span class="game-icon">🌈</span>
+      <div class="game-name">RANGEDLE</div>
+      <p class="game-desc">BLINDLE with a distance twist — every letter of a guess is colored by how far it is along the alphabet from the hidden letter: red 1–5, orange 6–10, yellow 11–15, blue 16–20, purple 21–25, green = correct. The numbered keyboard turns green by itself.</p>
+      <div class="game-tags">
+        <span class="tag tag-d">Live · Test · Offline</span>
+        <span class="tag tag-b">Alphabet distance colors</span>
+      </div>
+      <div class="play-row"><span></span><span class="play-cta">Play RANGEDLE →</span></div>
+    </a>
+
+    <a class="game-card codedle-card" data-game="codedle" href="/codedle/">
+      <span class="game-icon">🔢</span>
+      <div class="game-name">CODEDLE</div>
+      <p class="game-desc">Crack the number code! Every number is a letter's place if the hidden word were sorted A–Z. Each guess is colored green (right spot), yellow (wrong spot), blue (within 3 letters), pink (yellow + blue) or gray (not in the word) — and the keyboard colors itself.</p>
+      <div class="game-tags">
+        <span class="tag tag-d">Live · Test · Offline</span>
+        <span class="tag tag-b">Number code · 5 colors</span>
+      </div>
+      <div class="play-row"><span></span><span class="play-cta">Play CODEDLE →</span></div>
+    </a>
+
+    <a class="game-card shapedle-card" data-game="shapedle" href="/shapedle/">
+      <span class="game-icon">🧸</span>
+      <div class="game-name">SHAPEDLE</div>
+      <p class="game-desc">Decode the cute symbols! Every symbol stands for one letter of the hidden word (the same letter shows the same symbol). Guess the word, read the green, yellow and gray clues — and the keyboard colors itself. The host picks the symbol style.</p>
+      <div class="game-tags">
+        <span class="tag tag-d">Live · Test · Offline</span>
+        <span class="tag tag-b">Symbol row · cute packs</span>
+      </div>
+      <div class="play-row"><span></span><span class="play-cta">Play SHAPEDLE →</span></div>
+    </a>
+
+    <p class="hub-footer">Each game is fully independent — its own screen, controls, and TikTok connection.<br/>Bookmark this page, or jump straight to a game's own link.</p>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/home.js"></script>
+  <script src="/home-views.js"></script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+/* Colors come from whichever host panel the picker sits in (each game names its variables differently). */
+[data-color-shades], #shadePicker {
+  --cs-text:   var(--text, var(--paper, var(--ink-hi, var(--findle-ink, var(--text-1, #222)))));
+  --cs-muted:  var(--muted, var(--text-dim, var(--slate, var(--ink-mid, var(--findle-ink-dim, var(--text-2, #777))))));
+  --cs-border: var(--border, var(--line, var(--navy-line, var(--findle-line, rgba(0, 0, 0, 0.25)))));
+  --cs-panel:  var(--panel, var(--navy-panel, var(--findle-surface, var(--bg-2, #fff))));
+}
+/* ==========================================================================
+   COLOR SHADES picker (update 16) - shared by every game's settings panel.
+   Uses the host panel's own --text / --muted / --border / --panel variables, with fallbacks.
+   ========================================================================== */
+.shadeLegend { display: flex; justify-content: space-between; margin: 0 0 6px; font-size: 10.5px; color: var(--cs-muted); }
+.shadeRow { margin: 0 0 12px; }
+.shadeHead { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
+.shadeName { font-weight: 700; font-size: 13px; color: var(--cs-text); text-transform: none; letter-spacing: 0; }
+.shadeCurrent { font-size: 11px; color: var(--cs-muted); white-space: nowrap; text-transform: none; letter-spacing: 0; }
+.shadeHint { font-size: 11px; color: var(--cs-muted); margin: 0 0 5px; text-transform: none; letter-spacing: 0; font-weight: 500; }
+.shadeOptions { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; }
+.shadeBtn {
+  height: 30px; min-width: 0; padding: 0; position: relative; cursor: pointer;
+  border-radius: 7px; border: 2px solid rgba(0, 0, 0, 0.18);
+}
+.shadeBtn.isStandard { border-bottom-width: 4px; }
+.shadeBtn.selected { border-color: var(--cs-text); box-shadow: 0 0 0 2px var(--cs-panel), 0 0 0 4px var(--cs-text); }
+.shadeBtn.selected::after {
+  content: "\2713"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 13px; color: var(--shade-ink, #fff);
+}
+.shadeResetBtn {
+  display: block; width: 100%; margin-top: 4px; padding: 9px 12px; cursor: pointer; font: inherit; font-weight: 700; font-size: 13px;
+  color: var(--cs-text); background: transparent; border: 1.5px solid var(--cs-border); border-radius: 10px;
+}
+.shadeResetBtn:hover { background: rgba(128, 128, 128, 0.12); }
+@media (max-width: 420px) { .shadeBtn { height: 26px; border-radius: 6px; } }

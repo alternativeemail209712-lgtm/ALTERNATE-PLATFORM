@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+<title>CROSSDLE LIVE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Baloo+2:wght@600;700;800&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared/theme.css" />
+<script src="/shared/theme.js"></script>
+<script src="/shared/session.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="/shared/game-chrome.css" />
+<link rel="stylesheet" href="/shared/game-colors.css" />
+<link rel="stylesheet" href="/shared/color-shades.css" />
+<script src="/shared/color-shades.js" data-game="crossdle"></script>
+<link rel="stylesheet" href="/shared/legend.css" />
+<script src="/shared/legend.js" data-game="crossdle"></script>
+<script src="/shared/title-font.js" defer></script>
+</head>
+<body data-game="crossdle">
+<div id="app">
+
+  <!-- ============================================================
+       DIAGNOSTICS RIBBON - always visible, collapsible.
+  ============================================================= -->
+  <div id="diagBar" class="diag-bar">
+    <button id="diagToggle" class="diag-toggle" aria-label="Toggle diagnostics">
+      <span id="diagDot" class="status-dot status-idle"></span>
+      <span id="diagSummary">Events: 0 &middot; not connected</span>
+      <span class="diag-caret">▾</span>
+    </button>
+    <div id="diagPanel" class="diag-panel hidden">
+      <div class="diag-row"><b>Connection:</b> <span id="diagConnState">idle</span></div>
+      <div class="diag-row"><b>Sign key configured:</b> <span id="diagSignKey">checking…</span></div>
+      <div class="diag-row"><b>Dictionary:</b> <span id="diagDictionary">checking…</span></div>
+      <div class="diag-row"><b>Events received (all):</b> <span id="diagEvents">0</span></div>
+      <div class="diag-row"><b>Accepted onto board:</b> <span id="diagRecognized">0</span></div>
+      <div class="diag-row"><b>Last received:</b> <span id="diagLast">—</span></div>
+      <div class="diag-row diag-sub">If "Events received" stays at 0, messages aren't arriving at all (check the TikTok username / that you're live). If it climbs but "Accepted" doesn't, messages are arriving but aren't a single recognizable word matching this round's length - normal for chit-chat.</div>
+      <details class="diag-raw">
+        <summary>Raw event samples (first few, for troubleshooting)</summary>
+        <pre id="diagRawSamples">No samples yet.</pre>
+      </details>
+      <details class="diag-raw">
+        <summary>Recent errors (server-side, none of these should crash the game)</summary>
+        <pre id="diagErrors">No errors logged.</pre>
+      </details>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       HEADER
+  ============================================================= -->
+  <div class="heroBand hasDiag" id="heroBand">
+      <h1 class="heroTitle">CROSSDLE</h1>
+      <p class="heroTagline">Every guess is tested against the secret word and a sneaky decoy. Can chat untangle the clues?</p>
+    </div>
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-mark">✦</span>
+      <span class="brand-title">CROSS<span class="brand-accent">DLE</span></span>
+      <span class="brand-sub">live</span>
+    </div>
+    <div class="round-meta">
+      <a href="/" class="btn btn-ghost btn-icon-label" id="homeBtn" title="Choose another game">
+        <span>🏠</span><span class="btn-text">Games</span>
+      </a>
+      <label class="theme-picker crossdle-theme-picker">
+        🎨
+        <select data-theme-select aria-label="Platform theme color">
+          <option value="cream">Cream</option>
+          <option value="blue">Sky Blue</option>
+          <option value="green">Meadow Green</option>
+          <option value="pink">Blossom Pink</option>
+          <option value="violet">Lavender Violet</option>
+          <option value="honey">Honey Gold</option>
+        </select>
+      </label>
+      <div class="pill" id="roundPill">Round —</div>
+      <button id="leaderboardBtn" class="btn btn-ghost btn-icon-label" type="button">
+        <span>🏆</span><span class="btn-text">Leaderboard</span>
+      </button>
+      <button id="fullscreenBtn" class="btn btn-ghost btn-icon-label" type="button">
+        <span>⛶</span><span class="btn-text">Fullscreen</span>
+      </button>
+      <button id="howToPlayBtn" class="btn btn-ghost btn-icon-label" type="button">
+        <span>❓</span><span class="btn-text">How to Play</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ============================================================
+       LEADERBOARD NEWS TICKER - always on screen, scrolling the top 10.
+  ============================================================= -->
+  <div id="leaderboardTicker" class="leaderboard-ticker">
+    <span class="ticker-label">🏆 TOP 10</span>
+    <div class="ticker-track-wrap">
+      <div id="tickerTrack" class="ticker-track"></div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       MAIN CONTENT - single column, mobile-first. The keyboard
+       sits above the board, in its own section, clear of any chat.
+  ============================================================= -->
+  <main class="main-content">
+
+    <section class="board-section">
+
+      <!-- Reserved slot ABOVE the keyboard for the rejection message (never overlaps). -->
+      <div class="toast-slot">
+        <div id="rejectToast" class="reject-toast hidden"></div>
+      </div>
+
+      <!-- On-screen keyboard: shows the best status seen so far for every
+           letter this round, using the exact same colors/tiles as the
+           board so it reads instantly at a glance. -->
+      <div class="keyboard-section">
+        <div class="keyboard-row" id="keyboardRow1"></div>
+        <div class="keyboard-row" id="keyboardRow2"></div>
+      </div>
+
+      <div class="board-legend"><span class="legend-note">Unlimited guesses — only real words (matching this round's length) are tested &amp; added to the board.</span></div>
+
+      <div id="hintsRow" class="hints-row hidden">
+        <span class="hints-label">💡 Hints revealed:</span>
+        <div id="hintsTiles" class="hints-tiles"></div>
+      </div>
+
+
+      <div id="board" class="board">
+        <div class="board-empty" id="boardEmpty">
+          <div class="board-empty-icon">🎮</div>
+          <div>Waiting for the host to start the first round…</div>
+        </div>
+      </div>
+
+      <div id="roundBanner" class="round-banner hidden"></div>
+    </section>
+  </main>
+
+  <!-- ============================================================
+       HOST CONTROLS - a small floating button that opens a slide-up
+       panel, so by default the whole screen is just the game.
+  ============================================================= -->
+  <button id="hostFab" class="host-fab" type="button" aria-label="Open host controls">
+    <span class="host-fab-icon">⚙️</span>
+    <span class="host-fab-label">Host</span>
+  </button>
+
+  <div id="hostPanelOverlay" class="host-panel-overlay hidden">
+    <div class="host-panel-sheet">
+      <div class="host-panel-handle-bar"></div>
+      <div class="host-panel-header">
+        <span>⚙️ Host Controls</span>
+        <button id="hostPanelClose" class="modal-close" aria-label="Close host controls">✕</button>
+      </div>
+
+      <div class="host-cards">
+
+        <div class="host-card">
+          <div class="host-card-title">🔤 Title font</div>
+          <div data-title-font-picker></div>
+        </div>
+
+        <div class="host-card">
+          <div class="host-card-title">🎨 Color shades</div>
+          <div data-color-shades></div>
+        </div>
+
+        <div class="host-card">
+          <div class="host-card-title">📡 Connection</div>
+          <div class="host-card-row">
+            <input id="tiktokUsernameInput" type="text" placeholder="TikTok @username" autocomplete="off" />
+            <button id="connectBtn" class="btn btn-primary">Connect</button>
+            <button id="disconnectBtn" class="btn btn-ghost">Disconnect</button>
+          </div>
+          <label class="switch-label">
+            <input type="checkbox" id="testModeToggle" />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span>Test Mode (no live connection needed)</span>
+          </label>
+        </div>
+
+        <div class="host-card">
+          <div class="host-card-title">🎮 Round Control</div>
+          <div class="host-card-row">
+            <button id="startRoundBtn" class="btn btn-accent">▶ Start Round</button>
+            <button id="skipRoundBtn" class="btn btn-ghost">⏭ Skip</button>
+            <button id="hintBtn" class="btn btn-ghost">💡 Hint</button>
+            <button id="revealBtn" class="btn btn-ghost">👁 Reveal</button>
+          </div>
+          <div class="host-card-row">
+            <label class="mini-label">Word length
+              <select id="wordLengthSelect" class="select">
+                <option value="4">4 letters</option>
+                <option value="5" selected>5 letters</option>
+                <option value="6">6 letters</option>
+                <option value="7">7 letters</option>
+                <option value="8">8 letters</option>
+                <option value="9">9 letters</option>
+                <option value="10">10 letters</option>
+                <option value="11">11 letters</option>
+                <option value="12">12 letters</option>
+                <option value="13">13 letters</option>
+                <option value="14">14 letters</option>
+                <option value="15">15 letters</option>
+                <option value="16">16 letters</option>
+                <option value="17">17 letters</option>
+                <option value="18">18 letters</option>
+                <option value="19">19 letters</option>
+                <option value="20">20 letters</option>
+              </select>
+            </label>
+            <label class="mini-label">Next round
+              <select id="nextRoundDelaySelect" class="select">
+                <option value="3" selected>3s</option>
+                <option value="5">5s</option>
+                <option value="10">10s</option>
+                <option value="15">15s</option>
+                <option value="30">30s</option>
+                <option value="60">60s</option>
+              </select>
+            </label>
+          </div>
+          <div class="host-card-row">
+            <button id="resetLeaderboardBtn" class="btn btn-danger-ghost">Reset Leaderboard</button>
+          </div>
+        </div>
+
+        <div class="host-card">
+          <div class="host-card-title">🎲 Starter word</div>
+          <div class="host-card-row">
+            <label class="mini-label" style="display:flex;align-items:center;gap:8px;">
+              <input type="checkbox" id="starterWordToggle" checked />
+              Open every round with an automatic starter word
+            </label>
+          </div>
+          <p class="mini-note" style="margin:6px 2px 0;font-size:12px;opacity:.8;line-height:1.4;">On (default): one random word is played for free at the start of each round (worth no points) so chat has a first row of green / yellow / gray tiles to read. Off: every round starts on a blank board. Takes effect from the next round; your choice is remembered.</p>
+        </div>
+
+        <div class="host-card">
+          <div class="host-card-title">⌨️ Auto-color keyboard keys</div>
+          <div class="host-card-row">
+            <label class="mini-label" style="display:flex;align-items:center;gap:8px;">
+              <input type="checkbox" id="keyAutoColorToggle" checked />
+              Color each key like its letter's tiles
+            </label>
+          </div>
+          <p class="mini-note" style="margin:6px 2px 0;font-size:12px;opacity:.8;line-height:1.4;">On (default): every key shows the best color its letter has earned this round. Off: the keys stay plain. Your choice is remembered and applies right away.</p>
+        </div>
+
+        <div class="host-card">
+          <div class="host-card-title">🎯 Strict fit</div>
+          <div class="host-card-row">
+            <label class="mini-label" style="display:flex;align-items:center;gap:8px;">
+              <input type="checkbox" id="strictFitToggle" checked />
+              Only accept guesses that fit the earlier rows
+            </label>
+          </div>
+          <p class="mini-note" style="margin:6px 2px 0;font-size:12px;opacity:.8;line-height:1.4;">On (default): a guess must still be a possible answer given every row on the board - some decoy word must be able to explain the tiles that were shown. Off: any real word of the right length is tested and added. Your choice is remembered and applies right away.</p>
+        </div>
+
+        <div class="host-card">
+          <div class="host-card-title">📊 Live event tools</div>
+          <div data-engagement-tools></div>
+        </div>
+
+        <div class="host-card">
+          <div class="host-card-title">🎙️ Host Say</div>
+          <div class="host-card-row host-say-row">
+            <input id="hostSayInput" type="text" placeholder="Answer viewers or test a guess…" autocomplete="off" />
+            <button id="hostSayBtn" class="btn btn-primary">Send</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       HOW TO PLAY MODAL
+  ============================================================= -->
+  <div id="howToPlayModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <button id="howToPlayClose" class="modal-close" aria-label="Close">✕</button>
+      <h2 class="modal-title">❓ How to play CROSSDLE live</h2>
+
+      <div class="modal-section">
+        <h3>The goal</h3>
+        <p>The host picks a word length (4-20 letters) and starts a round with
+        a secret word of that length. Viewers guess by typing a matching-length
+        word <b>by itself</b> in the LIVE chat (e.g. just <code>APPLE</code> for
+        a 5-letter round, not "I think it's apple!"). Every valid word guessed
+        gets tested and added to the board. First person to type the exact
+        secret word wins the round.</p>
+      </div>
+
+      <div class="modal-section">
+        <h3>The twist: a decoy word every guess</h3>
+        <p>Here's what makes it tricky - after <i>every</i> guess, a fresh
+        <b>blue decoy word</b> is also chosen. A tile turns
+        <span class="hl-green">green</span> if the letter matches that
+        position in the <b>real answer OR the decoy</b>. A tile turns
+        <span class="hl-yellow">yellow</span> if the letter is
+        somewhere in the answer or the decoy, just not that exact spot. So a
+        green tile is a good sign, but it is <b>not proof</b> - it might only
+        be green because of the decoy!</p>
+
+        <div class="example-board">
+          <div class="example-caption">Example: guessing <b>CLAIM</b> while the decoy that round was <b>CRIME</b></div>
+          <div class="example-row">
+            <div class="tile-set" id="exampleGuessTiles"></div>
+            <span class="example-vs">vs. decoy</span>
+            <div class="tile-set" id="exampleDecoyTiles"></div>
+          </div>
+          <ul class="example-notes">
+            <li><span class="hl-green">C is green</span> - matches the decoy's C in spot 1, so this alone doesn't confirm the real answer starts with C.</li>
+            <li><span class="hl-yellow">L is yellow</span> - the decoy has no L at all, so this yellow can only be coming from the real answer (just not in spot 2).</li>
+            <li><span class="hl-grey">A is grey</span> - not in the answer or the decoy anywhere.</li>
+            <li><span class="hl-yellow">I is yellow</span> - the decoy has an I (in a different spot), so this one's ambiguous.</li>
+            <li><span class="hl-green">M is green</span> - the decoy's M is in a different spot, so this green <b>must</b> be from the real answer.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="modal-section">
+        <h3>The on-screen keyboard</h3>
+        <p>Above the board, every letter A-Z is colored with the best status
+        seen for it so far this round - handy for spotting at a glance which
+        letters are still worth trying.</p>
+      </div>
+
+      <div class="modal-section">
+        <h3>Guessing &amp; hints</h3>
+        <ul class="plain-list">
+          <li><b>Unlimited guesses, no clock</b> - a round runs until someone solves it (or the host skips/reveals it). Take your time.</li>
+          <li>Only guesses that are <b>real words at this round's length</b> get tested and shown on the board - anything else shows a quick on-screen note explaining why, then gets out of the way.</li>
+          <li>With <b>Strict fit</b> on (the default), a guess must also still be a <b>possible answer</b> given the rows already on the board - because of the decoy, a row can be explained by the real answer plus some decoy word. A guess that no decoy could explain flashes a quick reason and is skipped. The host can switch Strict fit off in the host panel to accept any real word.</li>
+          <li>The host can drop a free <b>hint letter</b> any time, and one also appears automatically every few guesses.</li>
+          <li>If nobody solves it before time runs out, the answer is revealed and a new round begins.</li>
+        </ul>
+      </div>
+
+      <div class="modal-section">
+        <h3>Scoring &amp; the leaderboard</h3>
+        <ul class="plain-list">
+          <li>+1 point just for making your first valid guess each round.</li>
+          <li>Solving it earns a bonus - bigger for fewer guesses, no hints used, and solving within the first few guesses overall.</li>
+          <li>Tap <b>🏆 Leaderboard</b> up top any time to see the full top 10 as a list - the scrolling ticker up top always shows it too.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <!-- ============================================================
+       LEADERBOARD LIST MODAL - opened from the header button; shows
+       the top 10 as a plain ranked list of names and points.
+  ============================================================= -->
+  <div id="leaderboardModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <button id="leaderboardModalClose" class="modal-close" aria-label="Close">✕</button>
+      <h2 class="modal-title">🏆 Top 10</h2>
+      <ol id="leaderboardModalList" class="leaderboard-list"></ol>
+    </div>
+  </div>
+
+  <!-- =============================================================
+       Win celebration — a floating overlay sequence (winner, then the
+       all-time leaderboard), same format as BLINDLE's. Only appears
+       when a round is actually SOLVED.
+  ============================================================= -->
+  <div id="celebrationOverlay" class="celebrationOverlay hidden">
+    <div class="celebrationCard">
+      <button id="celebrationCloseBtn" class="celebrationClose" aria-label="Close">✕</button>
+      <div id="celebrationBody"></div>
+      <div class="celebrationDots" id="celebrationDots">
+        <span class="celebDot" data-stage="0"></span>
+        <span class="celebDot" data-stage="1"></span>
+      </div>
+    </div>
+  </div>
+  <div id="celebConfettiLayer" class="celebConfettiLayer"></div>
+
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/shared/engagement.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

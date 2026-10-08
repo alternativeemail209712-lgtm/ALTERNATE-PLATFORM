@@ -1,0 +1,139 @@
+/* ==========================================================================
+   HOME page extras (update 30): the "Customize game cards" panel.
+   Uses the platform's theme tokens, so it follows whichever theme color is picked.
+   ========================================================================== */
+
+.cu-open{
+  appearance:none; -webkit-appearance:none; cursor:pointer;
+  width:34px; height:34px; border-radius:50%; padding:0;
+  display:inline-flex; align-items:center; justify-content:center; font-size:16px; line-height:1;
+  color:var(--theme-deep, #6B4423); background:var(--theme-card, #FFFBF2);
+  border:2px dashed var(--theme-line, #D9BE93);
+  box-shadow:0 2px 0 rgba(0,0,0,.08);
+}
+.cu-open:hover{ border-style:solid; }
+.cu-open:focus-visible{ outline:3px solid rgba(79,160,196,.6); outline-offset:2px; }
+
+.cu-overlay{
+  position:fixed; inset:0; z-index:1000; display:flex; align-items:flex-end; justify-content:center;
+  background:rgba(40,25,10,.45); -webkit-backdrop-filter:blur(2px); backdrop-filter:blur(2px);
+}
+.cu-overlay[hidden]{ display:none; }
+
+.cu-sheet{
+  position:relative; width:100%; max-width:540px; max-height:92vh; max-height:92dvh; overflow-y:auto; overscroll-behavior:contain;
+  background:var(--theme-bg-top, #FFF3DC); color:var(--theme-ink, #5B4636);
+  border:3px dashed var(--theme-line, #D9BE93); border-bottom:none; border-radius:24px 24px 0 0;
+  box-shadow:0 -10px 30px rgba(0,0,0,.25);
+  font-family:var(--font-body, "Quicksand", sans-serif);
+  animation:cuUp .22s ease;
+}
+@keyframes cuUp{ from{ transform:translateY(40px); opacity:0; } to{ transform:none; opacity:1; } }
+
+.cu-head{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:14px 16px 8px;
+}
+.cu-head h2{ margin:0; font-family:var(--font-head, "Fredoka", cursive); font-size:19px; font-weight:600; color:var(--theme-deep, #6B4423); }
+.cu-x{
+  appearance:none; cursor:pointer; width:34px; height:34px; border-radius:50%; font-size:16px; line-height:1;
+  color:var(--theme-deep, #6B4423); background:var(--theme-card, #FFFBF2); border:2px solid var(--theme-line, #D9BE93);
+}
+
+/* sticky: the game chooser + live preview stay visible while the controls scroll */
+.cu-top{
+  position:sticky; top:0; z-index:3; padding:6px 16px 10px;
+  background:var(--theme-bg-top, #FFF3DC); border-bottom:2px dashed var(--theme-line, #D9BE93);
+}
+.cu-chips{ display:flex; gap:6px; overflow-x:auto; padding:2px 0 8px; scrollbar-width:thin; }
+.cu-chip{
+  flex:0 0 auto; appearance:none; cursor:pointer; white-space:nowrap;
+  font-family:inherit; font-weight:700; font-size:12px; color:var(--theme-deep, #6B4423);
+  background:var(--theme-card, #FFFBF2); border:2px solid var(--theme-line, #D9BE93); border-radius:999px; padding:5px 11px;
+}
+.cu-chip.is-on{ background:var(--theme-deep, #6B4423); color:#fff; border-color:var(--theme-deep, #6B4423); }
+.cu-chip.is-hidden{ opacity:.5; text-decoration:line-through; }
+
+.cu-preview{ pointer-events:none; }
+.cu-preview .game-card{ margin-bottom:max(12px, calc(var(--cu-depth, 7px) + 4px)); padding:12px 16px; }
+.cu-preview .game-icon{ width:40px; height:40px; font-size:20px; margin-bottom:0; }
+.cu-preview .game-name{ margin:4px 0 2px; font-size:18px; }
+.cu-preview .game-desc{ display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden; margin-bottom:8px; }
+.cu-preview .play-row{ margin-top:4px; }
+.cu-preview .game-card::before{ width:90px; height:90px; top:-28px; right:-28px; }
+.cu-preview .game-card.is-preview-hidden{ opacity:.55; }
+@media (max-height:720px){
+  .cu-top{ position:static; }
+}
+
+.cu-body{ padding:6px 16px 4px; }
+.cu-sec{ margin:12px 0 4px; }
+.cu-sec > h3{
+  margin:0 0 8px; font-family:var(--font-head, "Fredoka", cursive); font-size:14px; font-weight:600; letter-spacing:.03em;
+  color:var(--theme-deep, #6B4423);
+}
+.cu-dots{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.cu-dot{
+  appearance:none; cursor:pointer; width:30px; height:30px; border-radius:50%; padding:0;
+  border:3px solid #fff; box-shadow:0 0 0 2px var(--theme-line, #D9BE93), 0 2px 0 rgba(0,0,0,.15);
+}
+.cu-dot:focus-visible{ outline:3px solid rgba(79,160,196,.7); outline-offset:2px; }
+.cu-hint{ font-size:11.5px; font-weight:600; color:var(--theme-ink-soft, #8A7864); margin:6px 0 0; line-height:1.4; }
+
+.cu-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+@media (max-width:380px){ .cu-grid{ grid-template-columns:1fr; } }
+.cu-row{
+  display:flex; align-items:center; gap:8px; min-width:0;
+  background:var(--theme-card, #FFFBF2); border:2px solid var(--theme-line, #D9BE93); border-radius:14px; padding:6px 8px;
+}
+.cu-row.is-set{ border-color:var(--theme-deep, #6B4423); }
+.cu-row label{ flex:1 1 auto; min-width:0; font-size:12px; font-weight:700; line-height:1.15; }
+.cu-row input[type=color]{
+  flex:0 0 auto; width:38px; height:30px; padding:0; border:2px solid #fff; border-radius:9px; cursor:pointer;
+  background:none; box-shadow:0 0 0 2px var(--theme-line, #D9BE93);
+}
+.cu-mini{
+  flex:0 0 auto; appearance:none; cursor:pointer; width:24px; height:24px; border-radius:50%; font-size:13px; line-height:1; padding:0;
+  color:var(--theme-deep, #6B4423); background:transparent; border:1.5px solid var(--theme-line, #D9BE93);
+  visibility:hidden;
+}
+.cu-row.is-set .cu-mini{ visibility:visible; }
+
+.cu-stack{ display:grid; gap:8px; }
+.cu-field{ display:grid; gap:4px; }
+.cu-field > span{ font-size:12px; font-weight:700; }
+.cu-field input[type=text], .cu-field textarea, .cu-field select{
+  width:100%; font-family:inherit; font-size:14px; font-weight:600; color:var(--theme-ink, #5B4636);
+  background:var(--theme-card, #FFFBF2); border:2px solid var(--theme-line, #D9BE93); border-radius:12px; padding:8px 10px;
+}
+.cu-field textarea{ min-height:84px; resize:vertical; line-height:1.4; }
+.cu-field input:focus, .cu-field textarea:focus, .cu-field select:focus{ outline:none; border-color:var(--theme-deep, #6B4423); }
+.cu-range{ display:flex; align-items:center; gap:8px; }
+.cu-range input[type=range]{ flex:1 1 auto; min-width:0; accent-color:var(--theme-deep, #6B4423); }
+.cu-range output{ flex:0 0 auto; min-width:38px; text-align:right; font-size:12px; font-weight:700; }
+.cu-two{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.cu-check{ display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; }
+.cu-check input{ width:20px; height:20px; accent-color:var(--theme-deep, #6B4423); }
+
+.cu-btn{
+  appearance:none; cursor:pointer; font-family:inherit; font-weight:700; font-size:12.5px;
+  color:var(--theme-deep, #6B4423); background:var(--theme-card, #FFFBF2);
+  border:2px solid var(--theme-line, #D9BE93); border-radius:999px; padding:8px 14px;
+  box-shadow:0 2px 0 rgba(0,0,0,.08);
+}
+.cu-btn:active{ transform:translateY(1px); box-shadow:none; }
+.cu-btn.cu-primary{ color:#fff; background:var(--theme-deep, #6B4423); border-color:var(--theme-deep, #6B4423); }
+.cu-btn.cu-warn{ color:#A84B26; }
+
+.cu-foot{
+  position:sticky; bottom:0; z-index:3; display:flex; flex-wrap:wrap; gap:8px; align-items:center;
+  padding:10px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  background:var(--theme-bg-top, #FFF3DC); border-top:2px dashed var(--theme-line, #D9BE93);
+}
+.cu-status{ flex:1 1 100%; font-size:11.5px; font-weight:700; color:var(--theme-ink-soft, #8A7864); }
+.cu-spacer{ flex:1 1 auto; }
+
+@media (prefers-reduced-motion:reduce){
+  .cu-sheet{ animation:none; }
+  .hub-badge{ transition:none; }
+}
