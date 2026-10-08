@@ -246,3 +246,18 @@ details.hv-fd{margin-bottom:14px}
 details.hv-fd>summary{cursor:pointer;list-style:none;font:600 17px var(--font-head);color:var(--wood-deep);background:var(--linen);border:2px dashed var(--thread);border-radius:16px;padding:12px 16px;margin-bottom:12px;min-height:44px}
 details.hv-fd>summary::-webkit-details-marker{display:none}
 details.hv-fd>summary::before{content:"📁 "}details.hv-fd[open]>summary::before{content:"📂 "}
+
+/* ===== UPDATE 36: controls live behind the ⚙️ button; the 5 feature icons are removed ===== */
+.feature-strip{display:none!important}
+body.hv-on .hub-sub{margin-bottom:22px}
+.hv-gear{font-size:20px}
+.hv-gear.hv-float{position:fixed;top:14px;right:14px;z-index:800}
+.hv-active{display:flex;align-items:center;justify-content:space-between;gap:10px;max-width:760px;margin:-8px 0 16px;padding:8px 12px;border:2px dashed var(--thread);border-radius:14px;background:var(--linen);font:700 13px var(--font-body);color:var(--wood-deep)}
+.hv-active[hidden]{display:none}
+.hv-active button{appearance:none;cursor:pointer;font:700 12px var(--font-body);padding:7px 12px;min-height:34px;border-radius:999px;border:2px solid var(--thread);background:#fff8;color:var(--wood-deep)}
+.hv-st{display:flex;gap:6px;margin:0 0 14px;overflow-x:auto;scrollbar-width:none}
+.hv-stb{flex:1 0 auto;appearance:none;cursor:pointer;font:700 13px var(--font-body);color:var(--wood-deep);background:var(--linen);border:2px dashed var(--thread);border-radius:12px;padding:10px 12px;min-height:44px}
+.hv-stb.on{background:var(--wood-deep);color:#fff;border-style:solid}
+.hv-modal .hv-search{margin-bottom:12px}
+.hv-modal .hv-count{margin:8px 2px 0}
+.hv-gear{width:40px;height:40px}

@@ -1,8 +1,8 @@
 /* UPDATE 35 - HOME: 35 layouts, host-made groups, search, keyboard + touch. Never edits the cards' content; works alongside home.js. */
 (function () {
   "use strict";
-  var hub = document.querySelector(".hub"), strip = document.querySelector(".feature-strip"), footer = document.querySelector(".hub-footer");
-  if (!hub || !strip || !footer) return;
+  var hub = document.querySelector(".hub"), footer = document.querySelector(".hub-footer");
+  if (!hub || !footer) return;
   document.body.classList.add("hv-on");
   var DEFAULT_VIEW = "cards"; // <- first layout new visitors see (any id below)
   var NEW_GAMES = ["shapedle"]; // ids that show a NEW tag
@@ -76,21 +76,26 @@
   function pull() { fetch("/api/home-groups", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (s) { adopt(s, true); }).catch(function () {}); }
   try { if (typeof window.io === "function") window.io("/home-hub").on("home:groups", function (s) { adopt(s, false); }); } catch (e) {}
 
-  /* ================= bar ================= */
-  var bar = el("div", "hv-bar"), r1 = el("div", "hv-r1"), chipsBox = el("div", "hv-chips");
-  var pickBtn = el("button", "hv-pickbtn"), prevB = el("button", "hv-sq", "‹"), nextB = el("button", "hv-sq", "›"), grpB = el("button", "hv-sq grp");
-  pickBtn.type = prevB.type = nextB.type = grpB.type = "button";
-  prevB.title = "Previous layout ( [ )"; nextB.title = "Next layout ( ] )"; pickBtn.title = "Choose a layout";
-  grpB.innerHTML = "🗂️ <span>Groups</span>"; grpB.title = "Make your own groups";
-  [pickBtn, prevB, nextB, grpB].forEach(function (b) { r1.appendChild(b); });
-  var search = el("input", "hv-search"); search.type = "search"; search.placeholder = "🔎 Search games...  ( press / )";
-  var count = el("div", "hv-count"), empty = el("div", "hv-empty", "No games match. Try another word."); empty.hidden = true;
-  var stage = el("div", "hv-stage");
-  bar.appendChild(r1); bar.appendChild(search); bar.appendChild(chipsBox); bar.appendChild(count);
-  strip.parentNode.insertBefore(bar, strip.nextSibling);
+  /* ================= settings: every control lives behind the ⚙️ button ================= */
+  var chipsBox = el("div", "hv-chips"), pickBtn = el("span");
+  var search = el("input", "hv-search"); search.type = "search"; search.placeholder = "Type a game name or a word...";
+  var count = el("div", "hv-count"), empty = el("div", "hv-empty", "No games match. Open ⚙️ Settings to change the search."); empty.hidden = true;
+  var stage = el("div", "hv-stage"), activeBar = el("div", "hv-active"); activeBar.hidden = true;
+  var subEl = document.querySelector(".hub-sub");
+  if (subEl && subEl.parentNode) subEl.parentNode.insertBefore(activeBar, subEl.nextSibling); else hub.insertBefore(activeBar, hub.firstChild);
   hub.insertBefore(stage, footer); hub.insertBefore(empty, footer);
   $c().forEach(function (c) { if (NEW_GAMES.indexOf(gid(c)) > -1) c.appendChild(el("span", "hv-tagnew", "NEW")); });
 
+  function updActive(shown, total) {
+    var on = search.value.trim() || cat !== "All";
+    activeBar.hidden = !on;
+    if (!on) return;
+    activeBar.innerHTML = "";
+    activeBar.appendChild(el("span", "", "Showing " + shown + " of " + total + " games"));
+    var x = el("button", "", "Show all"); x.type = "button";
+    x.onclick = function () { search.value = ""; cat = "All"; buildChips(); apply(true); };
+    activeBar.appendChild(x);
+  }
   function buildChips() {
     chipsBox.innerHTML = "";
     chipsBox.hidden = !groups.groups.length;
@@ -105,34 +110,36 @@
     if ($c().some(function (c) { return !groupOf(gid(c)); })) chip("_none", "Other");
   }
 
-  /* ================= modal helpers ================= */
   var ov = el("div", "hv-ov"); ov.hidden = true; document.body.appendChild(ov);
   ov.addEventListener("click", function (e) { if (e.target === ov) closeOv(); });
   function closeOv() { ov.hidden = true; statusEl = null; }
   function showOv(node) { ov.innerHTML = ""; ov.appendChild(node); ov.hidden = false; }
-  function mHead(t) { var h = el("div", "hv-mh"), x = el("button", "hv-x", "✕"); x.type = "button"; x.onclick = closeOv; h.appendChild(el("h2", "", t)); h.appendChild(x); return h; }
+  function mHead(t) { var h = el("div", "hv-mh"), x = el("button", "hv-x", "✕"); x.type = "button"; x.setAttribute("aria-label", "Close"); x.onclick = closeOv; h.appendChild(el("h2", "", t)); h.appendChild(x); return h; }
+  function step(d) { var i = 0; VIEWS.forEach(function (v, k) { if (v[0] === view) i = k; }); setView(VIEWS[(i + d + VIEWS.length) % VIEWS.length][0]); }
 
-  function openPicker() {
-    var m = el("div", "hv-modal"), g = el("div", "hv-pg");
-    m.appendChild(mHead("Choose a layout (" + VIEWS.length + ")"));
+  function findPanel(m) {
+    m.appendChild(el("div", "hv-ah", "Search games"));
+    m.appendChild(search);
+    if (groups.groups.length) { m.appendChild(el("div", "hv-ah", "Show only this group")); m.appendChild(chipsBox); }
+    else m.appendChild(el("p", "hv-help", "Tip: open the Groups tab to make your own groups (like Easy, Kids, Today's stream) and filter by them here."));
+    m.appendChild(count);
+  }
+  function layoutPanel(m) {
+    m.appendChild(el("p", "hv-help", "Pick how the games are shown on the home page (" + VIEWS.length + " layouts). It is remembered on this device."));
+    var g = el("div", "hv-pg");
     VIEWS.forEach(function (v) {
       var b = el("button", "hv-pi" + (v[0] === view ? " on" : "")); b.type = "button";
       b.innerHTML = "<b>" + v[1] + "</b>" + v[2];
-      b.onclick = function () { setView(v[0]); closeOv(); };
+      b.onclick = function () { setView(v[0]); Array.prototype.forEach.call(g.children, function (x) { x.classList.remove("on"); }); b.classList.add("on"); };
       g.appendChild(b);
     });
     m.appendChild(g);
-    m.appendChild(el("div", "hv-keys", "Keyboard: [ and ] change layout · / search · Esc close"));
-    showOv(m);
+    m.appendChild(el("div", "hv-keys", "Keyboard: [ and ] change layout · / opens search · Esc closes"));
   }
-  function step(d) { var i = 0; VIEWS.forEach(function (v, k) { if (v[0] === view) i = k; }); setView(VIEWS[(i + d + VIEWS.length) % VIEWS.length][0]); }
-  pickBtn.onclick = openPicker; prevB.onclick = function () { step(-1); }; nextB.onclick = function () { step(1); };
-
-  function openGroups() {
-    var m = el("div", "hv-modal");
+  function groupsPanel(m) {
     function draw() {
-      m.innerHTML = ""; m.appendChild(mHead("🗂️ My groups"));
-      m.appendChild(el("p", "hv-help", "Make your own groups (for example Geography, Easy, Kids, Today's stream) and put each game in one. They appear as filter buttons on the home page and as headings in the Sections, Hero, Tabs and Folders layouts."));
+      m.innerHTML = "";
+      m.appendChild(el("p", "hv-help", "Make your own groups (for example Geography, Easy, Kids, Today's stream) and put each game in one. They become filter buttons and headings in the Sections, Hero, Tabs and Folders layouts."));
       groups.groups.forEach(function (g, i) {
         var row = el("div", "hv-gr"), inp = el("input"); inp.value = g.name; inp.maxLength = 24; inp.setAttribute("aria-label", "Group name");
         inp.onchange = function () { g.name = inp.value.trim() || g.name; changed(); draw(); };
@@ -167,11 +174,32 @@
         });
       }
       statusEl = el("div", "hv-status"); m.appendChild(statusEl);
-      var done = el("button", "hv-done", "Done"); done.type = "button"; done.onclick = closeOv; m.appendChild(done);
     }
-    draw(); showOv(m);
+    draw();
   }
-  grpB.onclick = openGroups;
+
+  var settingsTab = "find";
+  function openSettings(tab) {
+    if (tab) settingsTab = tab;
+    var m = el("div", "hv-modal"), tb = el("div", "hv-st"), body = el("div", "hv-sbody");
+    m.appendChild(mHead("⚙️ Home settings"));
+    var tabs = [["find", "🔎 Find"], ["layout", "🎛 Layout"], ["groups", "🗂️ Groups"]];
+    function show() {
+      body.innerHTML = ""; statusEl = null;
+      Array.prototype.forEach.call(tb.children, function (b, i) { b.classList.toggle("on", tabs[i][0] === settingsTab); });
+      if (settingsTab === "find") findPanel(body); else if (settingsTab === "layout") layoutPanel(body); else groupsPanel(body);
+    }
+    tabs.forEach(function (t) { var b = el("button", "hv-stb", t[1]); b.type = "button"; b.onclick = function () { settingsTab = t[0]; show(); }; tb.appendChild(b); });
+    var done = el("button", "hv-done", "Show games"); done.type = "button"; done.onclick = closeOv;
+    m.appendChild(tb); m.appendChild(body); m.appendChild(done);
+    showOv(m); show();
+    if (settingsTab === "find") setTimeout(function () { try { search.focus(); } catch (e) {} }, 60);
+  }
+  var gear = el("button", "cu-open hv-gear", "⚙️"); gear.type = "button"; gear.title = "Home settings: layout, groups, search"; gear.setAttribute("aria-label", "Home settings");
+  gear.onclick = function () { openSettings(); };
+  var cuBtn = document.getElementById("cuOpen");
+  if (cuBtn && cuBtn.parentNode) cuBtn.parentNode.insertBefore(gear, cuBtn.nextSibling);
+  else { gear.classList.add("hv-float"); document.body.appendChild(gear); }
 
   /* ================= views ================= */
   function setView(v) {
@@ -286,6 +314,7 @@
     });
     if (first) first.classList.add("hv-first");
     count.textContent = shown + " of " + total + " games";
+    updActive(shown, total);
     empty.hidden = shown > 0;
     renderStage(!!force);
   }
@@ -321,7 +350,7 @@
     var typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target && e.target.tagName) || "");
     if (e.key === "Escape") { if (!ov.hidden) closeOv(); else if (e.target === search && search.value) { search.value = ""; apply(true); } return; }
     if (typing || e.ctrlKey || e.metaKey || e.altKey || !ov.hidden) return;
-    if (e.key === "/") { e.preventDefault(); search.focus(); }
+    if (e.key === "/") { e.preventDefault(); openSettings("find"); }
     else if (e.key === "[") step(-1);
     else if (e.key === "]") step(1);
     else if (view === "spotlight" && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
