@@ -73,9 +73,14 @@ export function registerTravle(io) {
   const nsp = io.of("/travle");
 
   let liveConn = null;
+  let currentConn = null; // update 36: also the connection that is auto-reconnecting after a drop
   let liveUsername = null;
 
   async function stopLive() {
+    if (currentConn && currentConn !== liveConn) {
+      try { await currentConn.disconnect(); } catch (e) {}
+    }
+    currentConn = null;
     if (liveConn) {
       try { await liveConn.disconnect(); } catch (e) {}
     }
@@ -145,6 +150,11 @@ export function registerTravle(io) {
           });
 
           conn.on("error", (err) => console.error("[travle] TikTok connection error:", err?.info || err));
+          currentConn = conn;
+          conn.on("reconnected", () => {
+            liveConn = conn;
+            nsp.emit("tiktok-status", { connected: true, username, reconnected: true });
+          });
 
           const state = await conn.connect();
           liveConn = conn;

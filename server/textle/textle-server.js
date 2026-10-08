@@ -669,6 +669,14 @@ async function connectToTikTok(username) {
         })
       );
       connection.on(
+        "reconnected",
+        safely("reconnected-event", () => {
+          diagnostics.connectionStatus = "live";
+          diagnostics.lastErrorMessage = null;
+          broadcastState();
+        })
+      );
+      connection.on(
         WebcastEvent.ERROR,
         safely("error-event", (err) => console.error("[TikTok] connection error event:", err))
       );
@@ -734,7 +742,7 @@ function describeConnectError(err) {
   if (message.includes("age") || message.includes("restricted") || message.includes("private")) {
     return "TikTok is restricting this LIVE (age-restricted or private), so it can't be joined from here.";
   }
-  return "Couldn't connect to TikTok LIVE after several tries. You can try again anytime.";
+  return "Couldn't connect to TikTok LIVE. Make sure the account is LIVE right now, wait about a minute, then press Connect again (TikTok sometimes limits requests from the server).";
 }
 
 const FAKE_USERNAMES = [
