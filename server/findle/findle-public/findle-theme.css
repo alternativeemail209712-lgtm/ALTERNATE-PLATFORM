@@ -1,0 +1,292 @@
+/* =============================================================
+   Findle Live — shared design system
+   Palette: "fresh dusk garden" — deep pine backgrounds with three
+   purposeful accents (leaf = correct/found, citrus = theme/score,
+   berry = host/alerts) rather than one generic neon accent.
+   Type: Fraunces (display, characterful serif) for theme titles and
+   big moments; Manrope (clean geometric sans) for all UI text.
+   ============================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,600&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+/* ---- Platform theme bridge ----
+   Findle keeps its own "fresh dusk garden" accent identity (leaf/citrus/
+   berry/sky below), but its backgrounds, surfaces, borders and ink now
+   follow the platform's shared theme picker (/shared/theme.css) instead
+   of being hardcoded, so choosing a theme on any page recolors Findle
+   too. --theme-* custom properties come from that shared stylesheet. */
+:root{
+  --findle-bg:        var(--theme-bg, #0E1512);
+  --findle-bg-glow:   var(--theme-bg-top, #16241C);
+  --findle-surface:   var(--theme-card, #17211C);
+  --findle-surface-2: var(--theme-surface-2, #1F2C25); /* a visibly deeper step than --findle-surface, for nested/secondary panels within a card */
+  --findle-line:      var(--theme-line, #2C3B32);
+  --findle-shadow:    var(--theme-shadow, rgba(0,0,0,.35));
+
+  --findle-ink:       var(--theme-deep, #F1F5EE);
+  --findle-ink-dim:   var(--theme-ink, #9FB0A3);
+  --findle-ink-faint: var(--theme-ink, #6C7C71);
+
+  --findle-leaf:      #7DC468;   /* found / correct / positive — solid-fill backgrounds, icons, dots, borders */
+  --findle-leaf-dark: #0F2013;
+  --findle-leaf-text: #1F6B2E;   /* readable-as-TEXT variant of --findle-leaf: the bright leaf green was tuned to pop as text on a near-black bg, and fails contrast as text on the platform's light theme backgrounds */
+  --findle-citrus:    #FFB84D;   /* theme title / score / emphasis — solid-fill backgrounds, icons, borders */
+  --findle-citrus-dark: #3A2708;
+  --findle-citrus-text: #8A5A17; /* readable-as-TEXT variant of --findle-citrus, same reasoning as --findle-leaf-text */
+  --findle-berry:     #FF7A7A;   /* host tag / errors / alerts — solid-fill backgrounds, icons, borders */
+  --findle-berry-text: #8C2E2E;  /* readable-as-TEXT variant of --findle-berry, same reasoning as --findle-leaf-text */
+  --findle-sky:       #6FC7D9;   /* secondary info accent — solid-fill backgrounds, icons, borders */
+  --findle-sky-text:  #1F6E7A;   /* readable-as-TEXT variant of --findle-sky, same reasoning as --findle-leaf-text */
+
+  --findle-radius-sm: 8px;
+  --findle-radius-md: 14px;
+  --findle-radius-lg: 22px;
+
+  --findle-vh: 1vh;
+}
+
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; }
+body{
+  background:
+    radial-gradient(ellipse 900px 500px at 15% -10%, var(--findle-bg-glow) 0%, transparent 60%),
+    var(--findle-bg);
+  color:var(--findle-ink);
+  font-family:'Manrope',sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+
+h1,h2,h3,.display-font{ font-family:'Fraunces',serif; }
+
+a{ color:var(--findle-sky-text); }
+
+button{
+  border:none; border-radius:var(--findle-radius-sm); padding:11px 16px;
+  font-weight:700; font-size:14px; font-family:'Manrope',sans-serif;
+  cursor:pointer; transition:transform .12s ease, filter .12s ease;
+  letter-spacing:0.01em;
+}
+button:active{ transform:scale(.96); }
+button:disabled{ opacity:.45; cursor:default; transform:none; }
+
+.btn-leaf{   background:var(--findle-leaf);   color:#0C2109; }
+.btn-citrus{ background:var(--findle-citrus); color:#3A2708; }
+.btn-berry{  background:var(--findle-berry);  color:#3A0B0B; }
+.btn-ghost{  background:var(--findle-surface-2); color:var(--findle-ink); border:1px solid var(--findle-line); }
+.btn-ghost:hover{ filter:brightness(1.15); }
+.btn-block{ width:100%; }
+
+.card{
+  background:var(--findle-surface); border:1px solid var(--findle-line);
+  border-radius:var(--findle-radius-lg); padding:18px;
+  box-shadow:0 8px 20px var(--findle-shadow);
+}
+
+.pill{
+  display:inline-flex; align-items:center; gap:6px; font-size:13px;
+  padding:6px 12px; border-radius:999px; background:var(--findle-surface-2); color:var(--findle-ink-dim);
+}
+.dot{ width:8px; height:8px; border-radius:50%; background:var(--findle-ink-faint); flex:none; }
+.dot.live{ background:var(--findle-leaf); box-shadow:0 0 8px var(--findle-leaf); }
+.dot.test{ background:var(--findle-citrus); box-shadow:0 0 8px var(--findle-citrus); }
+.dot.error{ background:var(--findle-berry); box-shadow:0 0 8px var(--findle-berry); }
+
+::-webkit-scrollbar{ width:8px; height:8px; }
+::-webkit-scrollbar-thumb{ background:var(--findle-line); border-radius:8px; }
+::-webkit-scrollbar-track{ background:transparent; }
+
+/* ---- shared game components ---- */
+.cell{
+  background:var(--findle-surface-2); border-radius:6px;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Fraunces',serif; font-weight:600; color:var(--findle-ink);
+  transition:background .4s ease, color .4s ease, opacity .5s ease, transform .5s ease;
+}
+.cell.flash{ animation:cellFlash .55s ease; }
+@keyframes cellFlash{
+  0%{ background:var(--findle-surface-2); transform:scale(1); }
+  45%{ background:var(--findle-leaf); color:var(--findle-leaf-dark); transform:scale(1.16); }
+  100%{ background:var(--findle-surface-2); color:var(--findle-ink); transform:scale(1); }
+}
+.cell.cleared{
+  background:transparent; color:transparent;
+  box-shadow:inset 0 0 0 1px var(--findle-line);
+  transform:scale(.8); opacity:.4;
+}
+
+.grid-square.celebrate{ animation:celebratePulse 1.2s ease; position:relative; overflow:visible; }
+@keyframes celebratePulse{
+  0%{ filter:hue-rotate(0deg) brightness(1); }
+  50%{ filter:hue-rotate(45deg) brightness(1.2); }
+  100%{ filter:hue-rotate(0deg) brightness(1); }
+}
+.confetti-bit{
+  position:absolute; bottom:0; font-size:20px; pointer-events:none;
+  animation:confettiRise 1.6s ease-out forwards;
+}
+@keyframes confettiRise{
+  0%{ transform:translateY(0) rotate(0deg); opacity:1; }
+  100%{ transform:translateY(-160px) rotate(50deg); opacity:0; }
+}
+
+.answer-pill{
+  background:var(--findle-surface-2); border:1px solid var(--findle-line); border-radius:999px;
+  padding:5px 11px; font-size:12.5px; letter-spacing:0.07em; color:var(--findle-ink-dim);
+  font-family:'Manrope',sans-serif; font-weight:700; display:inline-flex; align-items:center; gap:6px;
+  transition:background .3s, border-color .3s, color .3s; white-space:nowrap;
+}
+.answer-pill.found{ background:rgba(125,196,104,0.14); border-color:var(--findle-leaf); color:var(--findle-leaf-text); }
+.answer-pill .credit{ font-size:10.5px; font-weight:500; color:var(--findle-ink-faint); letter-spacing:normal; }
+
+/* ---- circular viewer avatars: found-word credit, leaderboard, ticker ---- */
+.avatarChip{
+  display:inline-flex; align-items:center; justify-content:center; flex:none;
+  border-radius:50%; overflow:hidden; vertical-align:middle;
+  box-shadow:0 1px 3px rgba(0,0,0,.3);
+}
+.avatarChipImg{ width:100%; height:100%; object-fit:cover; display:block; }
+.avatarChipFallback{
+  font-family:'Manrope',sans-serif; font-weight:800; color:#fff; text-transform:uppercase; user-select:none;
+  font-size:10px;
+}
+
+.leader-row{ display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid var(--findle-line); font-size:13.5px; }
+.leader-row:last-child{ border-bottom:none; }
+.leader-rank{ font-weight:800; width:20px; text-align:center; color:var(--findle-ink-faint); font-family:'Fraunces',serif; flex:none; }
+.leader-row:nth-child(1) .leader-rank{ color:var(--findle-citrus-text); }
+.leader-row:nth-child(2) .leader-rank{ color:#D9D9D9; }
+.leader-row:nth-child(3) .leader-rank{ color:#CD8A57; }
+.leader-name{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.leader-score{ font-weight:800; font-family:'Fraunces',serif; color:var(--findle-citrus-text); flex:none; }
+
+.feed-item{ line-height:1.4; font-size:13px; }
+.feed-item .u{ color:var(--findle-sky-text); font-weight:700; }
+.feed-item.win{ color:var(--findle-leaf-text); font-weight:600; }
+.feed-item.system{ color:var(--findle-ink-faint); font-style:italic; }
+.feed-item.host .u{ color:var(--findle-berry-text); }
+
+.empty-hint{ color:var(--findle-ink-faint); font-size:13px; }
+
+/* ---- news ticker (top-10 scorers, right-to-left) ---- */
+.ticker-wrap{
+  overflow:hidden; white-space:nowrap; background:var(--findle-surface-2);
+  border-bottom:1px solid var(--findle-line); position:relative;
+}
+.ticker-track{
+  display:inline-flex; align-items:center; gap:30px; padding:6px 0;
+  animation: tickerScroll linear infinite;
+  will-change: transform;
+}
+@keyframes tickerScroll{
+  from{ transform:translateX(0); }
+  to{ transform:translateX(-50%); }
+}
+.ticker-item{ font-size:12px; font-weight:700; color:var(--findle-ink-dim); white-space:nowrap; display:inline-flex; align-items:center; gap:5px; }
+.ticker-item .medal{ font-size:14px; }
+.ticker-item .tscore{ color:var(--findle-citrus-text); font-family:'Fraunces',serif; font-weight:700; }
+.ticker-empty{ font-size:12px; color:var(--findle-ink-faint); padding:7px 14px; }
+
+/* ---- leaderboard / round-recap overlay ---- */
+.recap-overlay{
+  position:fixed; inset:0; background:rgba(4,7,5,0.72); z-index:35;
+  display:flex; align-items:center; justify-content:center; padding:20px;
+  opacity:0; pointer-events:none; transition:opacity .25s ease;
+}
+.recap-overlay.show{ opacity:1; pointer-events:auto; }
+.recap-card{
+  background:var(--findle-surface); border:1px solid var(--findle-line); border-radius:var(--findle-radius-lg);
+  padding:20px; max-width:380px; width:100%; max-height:82vh; overflow-y:auto;
+  position:relative;
+}
+.recap-title{ font-family:'Fraunces',serif; font-weight:600; font-size:20px; color:var(--findle-citrus-text); text-align:center; margin-bottom:4px; }
+.recap-sub{ text-align:center; font-size:12px; color:var(--findle-ink-faint); margin-bottom:14px; }
+.recap-list{ display:flex; flex-direction:column; gap:6px; margin-bottom:16px; }
+.recap-row{
+  display:flex; justify-content:space-between; align-items:center; gap:8px;
+  background:var(--findle-surface-2); border-radius:8px; padding:8px 10px; font-size:13.5px;
+}
+.recap-row .rword{ font-weight:700; color:var(--findle-leaf-text); }
+.recap-row .rwho{ font-size:11.5px; color:var(--findle-ink-faint); }
+.recap-row .rpts{ font-family:'Fraunces',serif; font-weight:700; color:var(--findle-citrus-text); }
+.recap-divider{ border:none; border-top:1px solid var(--findle-line); margin:12px 0; }
+.recap-close{ position:absolute; top:10px; right:10px; }
+
+.medal-gold{ color:#FFD866; }
+.medal-silver{ color:#D9D9D9; }
+.medal-bronze{ color:#D8925A; }
+
+.combo-badge{
+  font-size:11px; font-weight:800; color:var(--findle-citrus-text); background:rgba(255,184,77,0.14);
+  border:1px solid var(--findle-citrus); border-radius:999px; padding:2px 8px; flex:none;
+  opacity:0; transform:scale(.85); transition:opacity .25s ease, transform .25s ease;
+}
+.combo-badge.show{ opacity:1; transform:scale(1); }
+
+/* ---- host announcement banner ---- */
+.host-banner{
+  position:fixed; top:0; left:0; right:0; z-index:40;
+  display:flex; justify-content:center;
+  /* Extra top padding keeps this fixed-to-screen banner clear of TikTok
+     LIVE's own on-screen UI — see --live-safe-top in /shared/theme.css. */
+  padding:calc(10px + var(--live-safe-top, 0px)) 16px 0;
+  transform:translateY(-120%); transition:transform .3s ease; pointer-events:none;
+}
+.host-banner.show{ transform:translateY(0); }
+.host-banner-inner{
+  background:var(--findle-berry); color:#3A0B0B; font-weight:700; font-size:13.5px;
+  padding:10px 16px; border-radius:999px; max-width:90%; text-align:center;
+  box-shadow:0 6px 20px rgba(0,0,0,0.35);
+}
+.host-banner-inner b{ font-weight:800; margin-right:6px; }
+
+/* =============================================================
+   KNIT FRAME — the big box that encloses all the letters
+   The outer frame of the letter grid is a knitted band (rows of
+   interlocking V-stitches). Its yarn colors are deliberately NOT
+   the platform theme color: each theme gets its own contrasting
+   pair of yarns (--knit-a / --knit-b), worked in 2-row stripes.
+   Used by both the host page and the TikTok display page.
+   ============================================================= */
+:root,
+[data-theme="cream"]  { --knit-a:#D1495B; --knit-b:#2A9D8F; }  /* rose + teal   on cream  */
+[data-theme="blue"]   { --knit-a:#F28C28; --knit-b:#D6336C; }  /* orange + raspberry on sky blue */
+[data-theme="green"]  { --knit-a:#D6336C; --knit-b:#F2A900; }  /* raspberry + gold on meadow green */
+[data-theme="pink"]   { --knit-a:#2A9D8F; --knit-b:#4C5FD5; }  /* teal + indigo on blossom pink */
+[data-theme="violet"] { --knit-a:#F2A93B; --knit-b:#2FB380; }  /* amber + mint  on lavender */
+[data-theme="honey"]  { --knit-a:#3E6FD1; --knit-b:#C2415D; }  /* blue + cranberry on honey gold */
+
+.grid-square > .grid{
+  --knit-w: 20px;                         /* thickness of the knitted band */
+  --knit-dark: color-mix(in srgb, var(--knit-a) 35%, #000);
+  /* band thickness + a small gap before the first cell */
+  padding: calc(var(--knit-w) + 4px);
+  background: var(--knit-dark);           /* shows in the tiny gaps between stitches */
+  border: none;
+  box-shadow:
+    0 0 0 2px var(--knit-dark),           /* crisp knitted edge */
+    0 8px 18px var(--findle-shadow);
+  isolation: isolate;
+}
+
+/* the stitches: V-shaped mask filled with two striped yarns + yarn shading */
+.grid-square > .grid::before{
+  content:""; position:absolute; inset:0; border-radius:inherit; z-index:0; pointer-events:none;
+  background:
+    linear-gradient(90deg,
+      rgba(0,0,0,.30) 0%, rgba(255,255,255,.26) 22%, rgba(0,0,0,.14) 50%,
+      rgba(255,255,255,.26) 78%, rgba(0,0,0,.30) 100%) 0 0 / 10px 12px,
+    linear-gradient(180deg, rgba(255,255,255,.18), rgba(0,0,0,.12)) 0 0 / 10px 12px,
+    repeating-linear-gradient(180deg, var(--knit-a) 0 24px, var(--knit-b) 24px 48px);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='12' viewBox='0 0 10 12'%3E%3Cpath d='M1.4 1.2 L5 10.4 L8.6 1.2' fill='none' stroke='%23000' stroke-width='3.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 0 0 / 10px 12px repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='12' viewBox='0 0 10 12'%3E%3Cpath d='M1.4 1.2 L5 10.4 L8.6 1.2' fill='none' stroke='%23000' stroke-width='3.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 0 0 / 10px 12px repeat;
+}
+
+/* the inner panel the letters sit on, with a little stitched-seam edge */
+.grid-square > .grid::after{
+  content:""; position:absolute; inset:var(--knit-w); border-radius:calc(var(--findle-radius-md) - 4px); z-index:1; pointer-events:none;
+  background: var(--findle-surface);
+  box-shadow: 0 0 0 2px var(--knit-dark), inset 0 2px 8px var(--findle-shadow);
+}
+
+/* letter cells sit above the panel */
+.grid-square > .grid > *{ position:relative; z-index:2; }

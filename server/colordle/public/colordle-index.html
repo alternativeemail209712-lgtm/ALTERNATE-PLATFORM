@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>COLORDLE — Live Word Game</title>
+<meta name="description" content="A live word game: read the colored empty boxes, match them to the shuffled keyboard colors, and guess the hidden word. Powered by TikTok LIVE chat." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap"
+  rel="stylesheet"
+/>
+<link rel="stylesheet" href="/shared/theme.css" />
+<script src="/shared/theme.js"></script>
+<script src="/shared/session.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="colordle-style.css" />
+<link rel="stylesheet" href="/shared/game-chrome.css" />
+<link rel="stylesheet" href="/shared/game-colors.css" />
+<link rel="stylesheet" href="/shared/color-shades.css" />
+<script src="/shared/color-shades.js" data-game="colordle"></script>
+<link rel="stylesheet" href="/shared/legend.css" />
+<script src="/shared/legend.js" data-game="colordle"></script>
+<script src="/shared/title-font.js" defer></script>
+</head>
+<body data-game="colordle">
+  <div class="confettiLayer" id="confettiLayer" aria-hidden="true"></div>
+
+  <div class="app" id="app">
+
+    <div class="heroBand" id="heroBand">
+      <h1 class="heroTitle">COLORDLE</h1>
+      <p class="heroTagline">Every letter wears a color that reshuffles each round. Match the colored boxes to the keyboard to find the word.</p>
+    </div>
+
+    <header class="topbar">
+      <div class="brandRow">
+        <span class="brandDot" id="brandDot"></span>
+        <div class="brandText">
+          <div class="brandTitle">COLORDLE</div>
+          <div class="brandSubtitle">chat-powered word game</div>
+        </div>
+      </div>
+      <div class="toolbarRow">
+        <a href="/" class="iconBtn" id="homeBtn" aria-label="Choose another game">🏠</a>
+        <span class="modeBadge" id="modeBadge">TEST</span>
+        <span class="lengthBadge" id="lengthBadge">— letters</span>
+        <button class="iconBtn" id="hintBtn" type="button" aria-label="Use a hint">💡</button>
+        <button class="iconBtn" id="helpBtn" type="button" aria-label="How to play">❓</button>
+        <button class="iconBtn" id="leaderboardBtn" type="button" aria-label="Leaderboard">🏆</button>
+        <button class="iconBtn" id="settingsBtn" type="button" aria-label="Settings">⚙️</button>
+        <button class="iconBtn" id="fullscreenBtn" type="button" aria-label="Enter fullscreen">⛶</button>
+      </div>
+    </header>
+
+    <div class="toastSlot"><div class="rejectionToast" id="rejectionToast" hidden></div></div>
+
+    <main class="stage" id="stage">
+      <section class="round-card">
+
+        <div class="keyboardSection" id="keyboardSection">
+          <div class="keyboardHead">
+            <span class="keyboardTitle">Keyboard colors <span class="keyboardShuffleNote">(reshuffled every round — match them to the boxes)</span></span>
+          </div>
+          <div class="keyboard" id="keyboard"></div>
+        </div>
+
+        <div class="tilesWrap" id="tilesWrap"></div>
+        <div class="hintChips" id="hintChips"></div>
+        <p class="hintExplainer" id="hintExplainer" hidden>💡 suggests a word that fits every clue so far (never the answer itself). Unlimited uses.</p>
+
+        <div class="offlineNote" id="offlineNote" hidden>
+          <p>Solo practice — type your guess in the box below.</p>
+        </div>
+
+        <div class="resultBanner" id="resultBanner" hidden>
+          <p id="resultText"></p>
+          <button class="btn btnGold" id="playAgainBtn" type="button">Play again</button>
+          <p class="autoContinueNote" id="autoContinueNote" hidden></p>
+        </div>
+
+        <div class="idleBanner" id="idleBanner">
+          <p>Open <strong>Settings</strong> (⚙️ top right) to choose a mode, word length, and difficulty, then tap Apply to begin.</p>
+        </div>
+
+      </section>
+    </main>
+
+    <footer class="controls" id="controls">
+      <button class="controlsHandle" id="controlsHandle" type="button" aria-expanded="true" aria-controls="controlsBody">
+        <span>Host controls</span>
+        <span id="handleArrow" class="handleArrow">▾</span>
+      </button>
+
+      <div class="controlsBody" id="controlsBody">
+
+        <div class="modeControls" id="liveControls" hidden>
+          <div class="row">
+            <input
+              id="tiktokUsernameBottom"
+              class="textInput"
+              placeholder="TikTok username (no @)"
+              autocapitalize="off" autocorrect="off" spellcheck="false"
+            />
+            <button id="connectBtnBottom" class="btn btnPrimary" type="button">Connect</button>
+          </div>
+          <div class="row">
+            <input id="setAnswerInputLive" class="textInput" placeholder="Set the secret word…" autocapitalize="off" autocorrect="off" spellcheck="false" />
+            <button id="setAnswerBtnLive" class="btn btnGhost" type="button">Set</button>
+          </div>
+          <p class="miniStatus" id="setAnswerErrorLive"></p>
+        </div>
+
+        <div class="modeControls" id="testControls" hidden>
+          <p class="sectionNote">Test Mode is simulating chat automatically — nothing to connect.</p>
+          <div class="row">
+            <input id="setAnswerInputTest" class="textInput" placeholder="Set the secret word…" autocapitalize="off" autocorrect="off" spellcheck="false" />
+            <button id="setAnswerBtnTest" class="btn btnGhost" type="button">Set</button>
+          </div>
+          <p class="miniStatus" id="setAnswerErrorTest"></p>
+        </div>
+
+        <div class="modeControls" id="offlineControls" hidden>
+          <div class="row">
+            <input
+              id="offlineGuessInput"
+              class="textInput"
+              placeholder="Type your guess…"
+              autocapitalize="off" autocorrect="off" spellcheck="false"
+            />
+            <button id="offlineGuessBtn" class="btn btnPrimary" type="button">Guess</button>
+          </div>
+          <p class="miniStatus" id="offlineError"></p>
+        </div>
+
+        <button id="giveUpBtn" class="btn btnGhost btnFull" type="button">Give up</button>
+        <p class="miniStatus" id="miniStatus"></p>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Settings drawer -->
+  <div class="drawerOverlay" id="settingsOverlay" hidden>
+    <div class="drawer">
+      <div class="drawerHead">
+        <h3>Settings</h3>
+        <button class="iconBtn" id="closeSettings" type="button" aria-label="Close">✕</button>
+      </div>
+
+      <div class="statusChips">
+        <div class="statusChip" id="modeChip">Mode: —</div>
+        <div class="statusChip" id="connChip">Connection: —</div>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Appearance</h4>
+        <p class="sectionNote">This colors the whole platform (hub and every game) — it used to live as a 🎨 icon in the top toolbar; it's here now so that row can stay a single line with every button visible, without shrinking, wrapping, scrolling, or needing to zoom out.</p>
+        <label class="theme-picker">
+          🎨
+          <select data-theme-select aria-label="Platform theme color">
+            <option value="cream">Cream</option>
+            <option value="blue">Sky Blue</option>
+            <option value="green">Meadow Green</option>
+            <option value="pink">Blossom Pink</option>
+            <option value="violet">Lavender Violet</option>
+            <option value="honey">Honey Gold</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Title font</h4>
+        <p class="sectionNote">Pick the font used for the game name at the top of the screen. Saved on this device and shared by every game.</p>
+        <div data-title-font-picker></div>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Mode</h4>
+        <button class="pickerRow" id="modePickerBtn" type="button">
+          <span id="modePickerLabel">Test — practice, scores not saved</span>
+          <span class="chev">▾</span>
+        </button>
+      </div>
+
+      <div class="drawerSection" id="tiktokSection">
+        <h4>TikTok auto-chat</h4>
+        <p class="sectionNote">
+          Connects to your LIVE room and feeds real chat guesses straight into the game. Only used in Live mode.
+        </p>
+        <label class="fieldLabel">Your TikTok username</label>
+        <input id="tiktokUsername" class="textInput" placeholder="e.g. yourhandle (no @)" autocapitalize="off" autocorrect="off" spellcheck="false" />
+        <div class="row">
+          <button id="connectBtn" class="btn btnGold" type="button">Connect</button>
+          <button id="disconnectBtn" class="btn btnGhost" type="button">Disconnect</button>
+        </div>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Word length</h4>
+        <label class="switchRow">
+          <input type="checkbox" id="randomLengthToggle" />
+          <span class="switchTrack"><span class="switchThumb"></span></span>
+          <span class="switchLabel">Random length each round</span>
+        </label>
+
+        <div id="fixedLengthRow">
+          <select id="wordLengthSelect" class="selectInput"></select>
+        </div>
+
+        <div id="randomLengthRow" class="row" hidden>
+          <label class="fieldLabel delayLabel">From</label>
+          <select id="lengthMinSelect" class="selectInput selectNarrow"></select>
+          <label class="fieldLabel delayLabel">to</label>
+          <select id="lengthMaxSelect" class="selectInput selectNarrow"></select>
+          <span class="fieldLabel delayLabel">letters</span>
+        </div>
+        <p class="sectionNote" id="randomLengthNote" hidden>Each new round picks a random length in this range (still filtered by the difficulty tier below).</p>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Difficulty</h4>
+        <select id="difficultySelect" class="selectInput">
+          <option value="normal">Normal — common words, fast solving</option>
+          <option value="medium">Medium — trickier words, needs real deduction</option>
+          <option value="hard">Hard — tough but fair, minimal hand-holding</option>
+          <option value="random">Random — any difficulty, fully mixed</option>
+        </select>
+        <p class="sectionNote">Scored on word familiarity, letter structure, and puzzle ambiguity — not just obscure vocabulary. "Random" skips scoring entirely and draws from every word of that length. Very short/long word lengths may not have every tier available.</p>
+      </div>
+
+      <div class="drawerSection">
+        <label class="switchRow">
+          <input type="checkbox" id="autoContinueToggle" />
+          <span class="switchTrack"><span class="switchThumb"></span></span>
+          <span class="switchLabel">Auto-continue after each round</span>
+        </label>
+        <div class="row" id="delayRow">
+          <label class="fieldLabel delayLabel">Delay before next round (seconds)</label>
+          <input type="number" id="delayInput" class="textInput selectNarrow" min="3" max="120" value="3" />
+        </div>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Win celebration</h4>
+        <p class="sectionNote">After a win, the leaderboard pops up automatically, then closes on its own. Auto-continue (above) always waits for this celebration to finish before starting the next round.</p>
+        <div class="row">
+          <label class="fieldLabel delayLabel">Show leaderboard for (seconds)</label>
+          <input type="number" id="leaderboardShowInput" class="textInput selectNarrow" min="1" max="30" value="3" />
+        </div>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Color shades</h4>
+        <p class="sectionNote">Choose how strong each color looks - the four keyboard colors <strong>and</strong> the green and gray of the guess tiles. It changes the empty boxes and the keyboard keys together. Ten shades per color, from lightest to darkest (the middle one is the standard look). It applies right away - no new round needed - and every screen connected to this game changes together.</p>
+        <div id="shadePicker"></div>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Starter word</h4>
+        <label class="switchRow">
+          <input type="checkbox" id="starterWordToggle" checked />
+          <span class="switchTrack"><span class="switchThumb"></span></span>
+          <span class="switchLabel">Open every round with an automatic starter word</span>
+        </label>
+        <p class="sectionNote">On (default): one random word - chosen to fit the colored boxes when possible - is placed on the board for free at the start of each round (worth no points) so chat has a first green / gray clue. Off: every round starts with just the empty colored boxes. Takes effect from the next round; your choice is remembered.</p>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Strict fit</h4>
+        <label class="switchRow">
+          <input type="checkbox" id="strictFitToggle" checked />
+          <span class="switchTrack"><span class="switchThumb"></span></span>
+          <span class="switchLabel">Only accept guesses that fit the earlier clues</span>
+        </label>
+        <p class="sectionNote">On (default): every letter of a guess must wear the color of the box it sits in AND the guess must reproduce the green / gray pattern of every guess on the board; otherwise it is skipped with the message below. Off: any real word of the right length is accepted and counted. Your choice is remembered and applies right away.</p>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Auto-color keyboard keys</h4>
+        <label class="switchRow">
+          <input type="checkbox" id="keyAutoColorToggle" checked />
+          <span class="switchTrack"><span class="switchThumb"></span></span>
+          <span class="switchLabel">Color each key like its letter's tiles</span>
+        </label>
+        <p class="sectionNote">On (default): every key on the keyboard takes the color its letter has earned on the board. Off: the keys stay plain (neutral) - viewers only read the colors on the tiles. Applies right away on every connected screen and is remembered.</p>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Guess rejection message</h4>
+        <p class="sectionNote">Shown briefly whenever Strict fit skips a guess that conflicts with a box color or an earlier clue.</p>
+        <div class="row">
+          <label class="fieldLabel delayLabel">Show rejection message for (seconds)</label>
+          <input type="number" id="rejectionToastShowInput" class="textInput selectNarrow" min="1" max="30" value="4" />
+        </div>
+      </div>
+
+      <button class="btn btnGold btnFull" id="applyBtn" type="button">Apply settings &amp; start new round</button>
+      <p class="sectionNote">Word length, difficulty, auto-continue and this delay only take effect once you tap Apply. Win-celebration duration applies right away.</p>
+
+      <div class="drawerSection">
+        <h4>
+          Diagnostics
+          <button id="diagToggle" class="linkBtn" type="button" aria-expanded="true">hide</button>
+        </h4>
+        <div class="diagGrid" id="diagGrid"></div>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Scores</h4>
+        <button class="btn btnDanger btnFull" id="resetRoundBtn" type="button">Reset this round's leaderboard</button>
+        <button class="btn btnDanger btnFull" id="resetTotalBtn" type="button">Reset all-time leaderboard</button>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Live event tools</h4>
+        <div data-engagement-tools></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mode picker popup -->
+  <div class="pickerOverlay" id="modePickerOverlay" hidden>
+    <div class="pickerSheet">
+      <button class="pickerOption" data-mode="live" type="button">
+        <span class="pickerRadio"></span>
+        <span class="pickerTextWrap">
+          <span class="pickerTitle">Live</span>
+          <span class="pickerDesc">Counts for the chat leaderboard</span>
+        </span>
+      </button>
+      <button class="pickerOption" data-mode="test" type="button">
+        <span class="pickerRadio"></span>
+        <span class="pickerTextWrap">
+          <span class="pickerTitle">Test</span>
+          <span class="pickerDesc">Practice — scores not saved</span>
+        </span>
+      </button>
+      <button class="pickerOption" data-mode="offline" type="button">
+        <span class="pickerRadio"></span>
+        <span class="pickerTextWrap">
+          <span class="pickerTitle">Offline</span>
+          <span class="pickerDesc">Host plays solo</span>
+        </span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Leaderboard drawer -->
+  <div class="drawerOverlay" id="leaderboardOverlay" hidden>
+    <div class="drawer">
+      <div class="drawerHead">
+        <h3>Leaderboard</h3>
+        <button class="iconBtn" id="closeLeaderboard" type="button" aria-label="Close">✕</button>
+      </div>
+      <div class="tabRow">
+        <button class="tabBtn active" id="tabThisRound" type="button">This round</button>
+        <button class="tabBtn" id="tabAllTime" type="button">All-time</button>
+      </div>
+      <ol class="leaderboard" id="leaderboardList"></ol>
+      <p class="sectionNote" id="leaderboardNote" hidden></p>
+    </div>
+  </div>
+
+  <!-- Win celebration: a sequence of floating windows -->
+  <div class="celebrationOverlay" id="celebrationOverlay" hidden>
+    <div class="celebrationCard" id="celebrationCard">
+      <button class="iconBtn celebrationClose" id="closeCelebration" type="button" aria-label="Close">✕</button>
+      <div class="celebrationBody" id="celebrationBody"></div>
+      <div class="celebrationDots" id="celebrationDots">
+        <span class="celebDot" data-stage="0"></span>
+        <span class="celebDot" data-stage="1"></span>
+        <span class="celebDot" data-stage="2"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- How-to-play modal -->
+  <div class="modalOverlay" id="howToOverlay" hidden>
+    <div class="modal">
+      <div class="modalHead">
+        <h3>How to play</h3>
+        <button class="iconBtn" id="closeHowTo" type="button" aria-label="Close">✕</button>
+      </div>
+      <ul class="howToList">
+        <li>Guess the hidden word — any length you like, chosen in Settings. <strong>Unlimited guesses</strong>, anyone can play, anytime.</li>
+        <li>At the top of the board is a row of <strong>empty colored boxes</strong>, one per letter of the hidden word. Each box is <span class="legendSwatch c-red">red</span> <span class="legendSwatch c-blue">blue</span> <span class="legendSwatch c-yellow">yellow</span> or <span class="legendSwatch c-purple">purple</span>. You are <strong>not</strong> told how many letters of each color there are — the boxes <em>are</em> the clue.</li>
+        <li>Check the <strong>keyboard</strong> to see the color of each letter. A letter can only go in a box of its own color — so box 1 must be a letter from the matching color, box 2 likewise, and so on. <strong>The keyboard colors are reshuffled every round</strong>, so last round's colors mean nothing.</li>
+        <li>After each guess the letter boxes change color: <span class="legendTile hit">green</span> — the letter is <strong>correct</strong> (right letter, right spot); <span class="legendTile miss">gray</span> — the letter is <strong>incorrect</strong>.</li>
+        <li>With <em>Strict fit</em> on (the default), a guess is only accepted if it still fits every clue — every letter matches the color of its box, and the green/gray pattern of every earlier guess is reproduced. One that contradicts a clue flashes a quick reason and is skipped. The host can switch Strict fit off in Settings to accept any real word.</li>
+        <li>💡 unlimited hints suggest a word that fits the clues (never the answer). Difficulty (Normal/Medium/Hard/Random) sets how tricky the word itself is.</li>
+        <li><strong>Live</strong> = real TikTok chat. <strong>Test</strong> = simulated chat, nothing saved. <strong>Offline</strong> = just you, type guesses directly.</li>
+      </ul>
+      <button class="btn btnGold" id="closeHowTo2" type="button">Got it</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/shared/engagement.js"></script>
+  <script src="colordle-game.js"></script>
+</body>
+</html>

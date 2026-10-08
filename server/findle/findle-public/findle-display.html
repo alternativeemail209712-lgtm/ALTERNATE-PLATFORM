@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>FINDLE Live — Display</title>
+<link rel="stylesheet" href="/shared/theme.css" />
+<script src="/shared/theme.js"></script>
+<script src="/shared/session.js"></script>
+<link rel="stylesheet" href="/shared/color-shades.css" />
+<script src="/shared/color-shades.js" data-game="findle"></script>
+<link rel="stylesheet" href="/findle-public/findle-theme.css">
+<style>
+  html,body{ height:100%; overflow:hidden; }
+  body{ height: calc(var(--findle-vh) * 100); display:flex; flex-direction:column; }
+  /* Extra top padding reserves space for TikTok LIVE's own on-screen UI
+     (viewer name, live badge, gift/exit icons) so it never covers the
+     top bar — see --live-safe-top in /shared/theme.css. */
+  .topbar{ flex:none; display:flex; justify-content:space-between; align-items:center; padding:calc(14px + var(--live-safe-top)) 22px 6px; gap:10px; }
+  .brand{ font-size:19px; font-weight:600; flex:none; }
+  .brand em{ font-style:normal; color:var(--findle-citrus-text); }
+  .icon-btn{
+    background:var(--findle-surface-2); border:1px solid var(--findle-line); color:var(--findle-ink);
+    border-radius:10px; width:36px; height:36px; padding:0; flex:none;
+    display:flex; align-items:center; justify-content:center; font-size:17px;
+  }
+  .icon-btn.active{ border-color:var(--findle-citrus); color:var(--findle-citrus-text); }
+  .icon-group{ display:flex; gap:8px; flex:none; }
+
+  .theme-row{ flex:none; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 24px 6px; flex-wrap:wrap; }
+  .theme-title{ font-size:clamp(23px, 3.6vw, 34px); font-weight:600; color:var(--findle-citrus-text); font-family:'Fraunces',serif; }
+  .progress-info{ display:flex; align-items:center; gap:14px; }
+  .progress-dots{ display:flex; flex-wrap:wrap; gap:6px; max-width:160px; justify-content:flex-end; }
+  .progress-dot{ width:11px; height:11px; border-radius:50%; background:var(--findle-surface-2); border:1px solid var(--findle-line); }
+  .progress-dot.done{ background:var(--findle-leaf); border-color:var(--findle-leaf); }
+  /* Time to answer is unlimited - no more countdown clock, so the .timer
+     rule/element is gone (see the theme row markup + JS below). */
+
+  .grid-wrap{ flex:1 1 auto; min-height:0; display:flex; align-items:center; justify-content:center; padding:6px 24px; }
+  /* Self-contained square sized from viewport units alone (see host.html
+     for the full rationale) — keeps size AND shape stable regardless of
+     layout context, including fullscreen toggling. */
+  .grid-square{
+    width: min(88vw, 68dvh, 720px);
+    height: min(88vw, 68dvh, 720px);
+    aspect-ratio: 1 / 1;
+    position:relative;
+  }
+  .grid{ position:absolute; inset:0; display:grid; gap:4px; background:var(--findle-surface); border:1px solid var(--findle-line); border-radius:var(--findle-radius-lg); padding:8px; }
+  .cell{ font-size:clamp(9px, 2.2vw, 22px); border-radius:6px; }
+
+  .answers-strip{ flex:none; display:flex; flex-wrap:wrap; gap:8px; justify-content:center; padding:10px 24px; }
+  .instructions{ flex:none; text-align:center; color:var(--findle-ink-faint); font-size:13px; padding:0 24px 12px; }
+  .instructions b{ color:var(--findle-sky-text); font-weight:700; }
+</style>
+</head>
+<body>
+
+  <div class="host-banner" id="hostBanner"><div class="host-banner-inner"><b>HOST:</b><span id="hostBannerText"></span></div></div>
+
+  <div class="topbar">
+    <div class="brand">FIN<em>DLE</em> live</div>
+    <div class="pill"><span class="dot" id="statusDot"></span><span id="statusText">Connecting…</span></div>
+    <div class="icon-group">
+      <a href="/" class="icon-btn" id="homeBtn" title="Choose another game">🏠</a>
+      <button class="icon-btn" id="leaderboardBtn" title="Leaderboard">🏆</button>
+      <button class="icon-btn" id="fullscreenBtn" title="Fullscreen">⛶</button>
+      <button class="icon-btn" id="enableSoundBtn" title="Enable sound">🔈</button>
+    </div>
+  </div>
+
+  <div class="ticker-wrap" id="tickerOuter">
+    <div class="ticker-track" id="tickerTrack"></div>
+  </div>
+
+  <div class="theme-row">
+    <div class="theme-title" id="themeTitle">— waiting for host —</div>
+    <div class="progress-info">
+      <div class="progress-dots" id="progressDots"></div>
+      <div class="combo-badge" id="comboBadge"></div>
+    </div>
+  </div>
+
+  <div class="grid-wrap" id="gridWrap">
+    <div class="grid-square" id="gridSquare">
+      <div class="grid" id="grid"></div>
+    </div>
+  </div>
+
+  <div class="answers-strip" id="answers"></div>
+  <div class="instructions">Type your guess in the <b>TikTok LIVE comments</b> to find a word!</div>
+
+  <div class="recap-overlay" id="recapOverlay">
+    <div class="recap-card">
+      <button class="icon-btn recap-close" id="recapCloseBtn">✕</button>
+      <div class="recap-title" id="recapTitle">🏆 Leaderboard</div>
+      <div class="recap-sub" id="recapSub"></div>
+      <div id="recapBody"></div>
+      <hr class="recap-divider" id="recapDivider" style="display:none;">
+      <div id="recapLeaderboard"></div>
+    </div>
+  </div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/shared/engagement.js"></script>
+<script src="/findle-public/findle-game-render.js"></script>
+<script src="/findle-public/findle-audio.js"></script>
+<script>
+  function setVH(){ document.documentElement.style.setProperty('--findle-vh', (window.innerHeight * 0.01) + 'px'); }
+  window.addEventListener('resize', setVH);
+  window.addEventListener('orientationchange', setVH);
+  setVH();
+
+  const socket = io('/findle');
+  const R = FindleRender;
+  let latestLeaderboard = [];
+  let soundOn = false;
+
+  // --- sound (needs one tap first, per browser autoplay rules) ---
+  const enableSoundBtn = document.getElementById('enableSoundBtn');
+  enableSoundBtn.onclick = () => {
+    FindleAudio.unlock();
+    soundOn = !soundOn;
+    enableSoundBtn.classList.toggle('active', soundOn);
+    enableSoundBtn.textContent = soundOn ? '🔊' : '🔈';
+  };
+
+  // --- fullscreen ---
+  const fsBtn = document.getElementById('fullscreenBtn');
+  function isFullscreen(){ return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  function updateFsIcon(){ fsBtn.classList.toggle('active', isFullscreen()); }
+  fsBtn.onclick = () => {
+    if (isFullscreen()) {
+      (document.exitFullscreen || document.webkitExitFullscreen || function(){}).call(document);
+    } else {
+      const el = document.documentElement;
+      const req = el.requestFullscreen || el.webkitRequestFullscreen;
+      if (req) req.call(el).catch(() => {});
+    }
+  };
+  document.addEventListener('fullscreenchange', updateFsIcon);
+  document.addEventListener('webkitfullscreenchange', updateFsIcon);
+
+  // --- leaderboard overlay ---
+  let overlayAutoHideTimer = null;
+  function showOverlay(opts){
+    document.getElementById('recapTitle').textContent = opts.title;
+    document.getElementById('recapSub').textContent = opts.sub || '';
+    document.getElementById('recapBody').innerHTML = opts.recapHtml || '';
+    document.getElementById('recapDivider').style.display = opts.recapHtml ? '' : 'none';
+    R.renderLeaderboard(document.getElementById('recapLeaderboard'), opts.leaderboard || [], 'No scores yet — be the first!');
+    document.getElementById('recapOverlay').classList.add('show');
+    clearTimeout(overlayAutoHideTimer);
+    if (opts.autoHideMs) overlayAutoHideTimer = setTimeout(hideOverlay, opts.autoHideMs);
+  }
+  function hideOverlay(){ document.getElementById('recapOverlay').classList.remove('show'); clearTimeout(overlayAutoHideTimer); }
+  document.getElementById('recapCloseBtn').onclick = hideOverlay;
+  document.getElementById('leaderboardBtn').onclick = () => {
+    showOverlay({ title: '🏆 Leaderboard', sub: '', recapHtml: '', leaderboard: latestLeaderboard, autoHideMs: null });
+  };
+
+  let hostBannerTimeout = null;
+  socket.on('hostMessage', (info) => {
+    document.getElementById('hostBannerText').textContent = info.text;
+    const banner = document.getElementById('hostBanner');
+    banner.classList.add('show');
+    clearTimeout(hostBannerTimeout);
+    hostBannerTimeout = setTimeout(() => banner.classList.remove('show'), 6000);
+  });
+
+  socket.on('puzzleComplete', (info) => {
+    if (info.cleared) {
+      R.celebrate(document.getElementById('gridSquare'));
+      if (soundOn) FindleAudio.playComplete();
+    }
+    const title = info.cleared ? '🎉 Puzzle Cleared!' : "⏱️ Time's Up!";
+    const sub = info.theme ? 'Theme: ' + info.theme : '';
+    showOverlay({
+      title, sub,
+      recapHtml: R.buildRecapRows(info.recap),
+      leaderboard: info.leaderboard,
+      autoHideMs: (info.leaderboardDisplaySeconds || 3) * 1000,
+    });
+  });
+
+  let comboBadgeTimeout = null;
+  socket.on('wordFound', (info) => {
+    if (soundOn) FindleAudio.playFind(info.comboCount);
+    if (info.multiplier > 1) {
+      if (soundOn) FindleAudio.playCombo();
+      const badge = document.getElementById('comboBadge');
+      badge.textContent = '🔥 x' + info.multiplier;
+      badge.classList.add('show');
+      clearTimeout(comboBadgeTimeout);
+      comboBadgeTimeout = setTimeout(() => badge.classList.remove('show'), 2200);
+    }
+  });
+
+  socket.on('state', (s) => {
+    const dot = document.getElementById('statusDot');
+    dot.className = 'dot ' + (s.connection.mode === 'live' ? 'live' : s.connection.mode === 'test' ? 'test' : '');
+    document.getElementById('statusText').textContent =
+      s.connection.mode === 'live' ? 'LIVE — reading @' + s.connection.tiktokUsername :
+      s.connection.mode === 'test' ? 'Test Mode' : 'Waiting to connect';
+
+    document.getElementById('themeTitle').textContent = s.game.theme || '— waiting for host —';
+
+    if (s.game.grid) {
+      R.resetTrackingIfNewPuzzle(s.game.theme);
+      R.renderGrid(document.getElementById('grid'), s.game.gridSize, s.game.grid, s.game.words, s.game.clearedGrid);
+      R.renderAnswers(document.getElementById('answers'), s.game.words);
+      R.renderProgress(document.getElementById('progressDots'), s.game.wordsFound, s.game.wordsTotal);
+    }
+
+    // Time to answer is unlimited - there is no countdown clock anymore.
+
+    latestLeaderboard = s.leaderboard;
+    R.renderTicker(document.getElementById('tickerOuter'), document.getElementById('tickerTrack'), s.leaderboard);
+  });
+</script>
+</body>
+</html>
