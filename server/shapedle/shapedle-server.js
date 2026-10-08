@@ -38,10 +38,11 @@ import express from "express";
 import http from "http";
 import path from "path";
 import { fileURLToPath } from "url";
-import { TikTokLiveConnection, WebcastEvent, SignConfig } from "tiktok-live-connector";
+import { TikTokLiveConnection, WebcastEvent, ControlEvent, SignConfig } from "tiktok-live-connector";
+import { explainTikTokError } from "../shared/tiktok-errors.js";
 import { ANSWER_WORDS, MIN_WORD_LENGTH, MAX_WORD_LENGTH } from "../blindle/blindle-answers.js";
 import { Engagement } from "../engagement/engagement-hub.js";
-import { resolveHostAvatar, adoptHostAvatar, isHostUser } from "../shared/host-avatar.js";
+import { resolveHostAvatar, adoptHostAvatar, isHostUser, collectUserObjects } from "../shared/host-avatar.js";
 import { getStrictFit, setStrictFit } from "../shared/strict-fit-store.js";
 import { getStarterWord, setStarterWord } from "../shared/starter-word-store.js";
 import { getKeyAutoColor, setKeyAutoColor } from "../shared/key-autocolor-store.js";
@@ -50,7 +51,7 @@ import {
   SET_SIZES, BUILTIN_SET_IDS, VIEWERS_SET, getSymbolOptions, setSymbolOptions
 } from "../shared/symbol-options-store.js";
 import {
-  registerViewer, listViewers, viewerCounts, usableViewers, viewerInfo, readViewerPicture,
+  registerViewer, retryMissingPictures, listViewers, viewerCounts, usableViewers, viewerInfo, readViewerPicture,
   setViewersSelected, setAllViewersSelected, forgetViewer, forgetAllViewers, allowRemovedViewers, onRosterChange
 } from "../shared/viewer-roster-store.js";
 import { dictionaryState, loadDictionary, isValidGuessWord } from "../blindle/blindle-dictionary.js";
@@ -91,7 +92,7 @@ function extractField(raw, candidatePaths, fallback) {
 
 const USERNAME_PATHS = [
   "uniqueId", "uniqueid", "user.uniqueId", "user.uniqueid", "user.username",
-  "username", "nickname", "user.nickname", "author.uniqueId", "author.nickname", "data.uniqueId"
+  "username", "user.displayId", "displayId", "nickname", "user.nickname", "author.uniqueId", "author.nickname", "data.uniqueId"
 ];
 const MESSAGE_PATHS = ["comment", "message", "content", "text", "msg", "data.comment", "data.message"];
 const AVATAR_PATHS = [
@@ -107,13 +108,8 @@ const NICKNAME_PATHS = ["user.nickname", "nickname", "data.nickname"];
 function noteViewer(raw) {
   try {
     if (game.mode !== "live") return;
-    const username = extractField(raw, USERNAME_PATHS, null);
-    if (!username || username === "viewer") return;
-    registerViewer(
-      String(username),
-      extractField(raw, NICKNAME_PATHS, null),
-      extractField(raw, AVATAR_PATHS, null)
-    );
+    // update 37: finds EVERY viewer in the event (not only the sender) with ALL their picture links
+    for (const p of collectUserObjects(raw)) registerViewer(p.u, p.nick, p.urls);
   } catch (err) {
     // never let roster bookkeeping disturb the game
   }
@@ -133,6 +129,13 @@ function extractChatFields(raw) {
 // to carry it. Host-typed guesses and Test/Offline mode simply have no
 // entry here, and the client falls back to a colored initial circle.
 const knownAvatars = new Map();
+// update 37: the picture to show for a viewer next to a guess / on the leaderboard: our own saved copy when we have it
+// (never expires, never HEIC, never blocked), otherwise the last link TikTok sent.
+function avatarFor(name) {
+  const info = viewerInfo(String(name || ""));
+  if (info) return viewerBasePath + "/viewer-avatar/" + encodeURIComponent(info.u) + "?v=" + info.v;
+  return avatarFor(name);
+}
 
 // The profile picture of the HOST of the current TikTok LIVE session (the
 // account this game is connected to). Shown on the automatic "starter word"
@@ -382,7 +385,7 @@ function checkConsistency(word) {
 
 function processGuess(word, caller) {
   const clue = scoreClue(word, game.secretWord);
-  const avatarUrl = knownAvatars.get(caller) || null;
+  const avatarUrl = avatarFor(caller);
   game.guesses.push({ word, clue, caller, avatarUrl });
 
   if (word === game.secretWord) {
@@ -586,7 +589,7 @@ function getLeaderboard(map) {
   return [...map.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10)
-    .map(([username, score]) => ({ username, score, avatarUrl: knownAvatars.get(username) || null }));
+    .map(([username, score]) => ({ username, score, avatarUrl: avatarFor(username) }));
 }
 
 setInterval(
@@ -634,7 +637,7 @@ function handleIncomingRawEvent(raw) {
     });
   }
 
-  game.recentComments.unshift({ username, text, avatarUrl: knownAvatars.get(username) || null, at: Date.now() });
+  game.recentComments.unshift({ username, text, avatarUrl: avatarFor(username), at: Date.now() });
   if (game.recentComments.length > 30) game.recentComments.length = 30;
 
   const normalized = normalizeGuess(text);
@@ -702,9 +705,13 @@ async function connectToTikTok(username) {
       connection.on(WebcastEvent.CHAT, safely("chat-event", (data) => handleIncomingRawEvent(data)));
       // (update 29) anyone who joins, likes, gifts, follows or shares joins the audience roster too, so
       // their picture can be picked as a symbol even if they never type a guess.
-      for (const ev of [WebcastEvent.MEMBER, WebcastEvent.LIKE, WebcastEvent.GIFT, WebcastEvent.FOLLOW, WebcastEvent.SHARE]) {
+      for (const ev of [WebcastEvent.MEMBER, WebcastEvent.LIKE, WebcastEvent.GIFT, WebcastEvent.FOLLOW, WebcastEvent.SHARE,
+        WebcastEvent.ROOM_USER || "roomUser", WebcastEvent.SUBSCRIBE || "subscribe", WebcastEvent.EMOTE_CHAT || "emote",
+        WebcastEvent.SOCIAL || "social", WebcastEvent.ENVELOPE || "envelope"]) {
         if (ev) connection.on(ev, safely("viewer-event", (data) => noteViewer(data)));
       }
+      // update 37: safety net - every decoded TikTok message of any kind is scanned for viewers (and their pictures)
+      connection.on(ControlEvent.DECODED_DATA || "decodedData", safely("viewer-scan", (name, data) => noteViewer(data)));
       connection.on(
         WebcastEvent.DISCONNECTED,
         safely("disconnected-event", () => {
@@ -751,6 +758,7 @@ async function connectToTikTok(username) {
     } catch (err) {
       console.error(`[TikTok] Connect attempt ${attempt + 1} failed:`, err?.message || err);
       diagnostics.retryAttempt = attempt + 1;
+      diagnostics.lastErrorMessage = "Try " + (attempt + 1) + " failed. " + describeConnectError(err);
       const isLastAttempt = attempt === RETRY_DELAYS_MS.length;
       if (isLastAttempt) {
         diagnostics.connectionStatus = "error";
@@ -766,6 +774,10 @@ async function connectToTikTok(username) {
 }
 
 function describeConnectError(err) {
+  return explainTikTokError(err, (typeof diagnostics !== "undefined" && diagnostics && diagnostics.tiktokUsername) || "");
+}
+// (older generic wording, no longer used)
+function describeConnectErrorLegacy(err) {
   const message = String(err?.message || err || "").toLowerCase();
   if (message.includes("not found") || message.includes("does not exist")) {
     return "That TikTok username couldn't be found. Double-check the spelling.";
@@ -836,7 +848,7 @@ function buildStatePayload() {
       lengthMax: game.lengthMax,
       secretWord: game.status === "lost" ? game.secretWord : null,
       // The automatic starter word shows the LIVE host's profile picture.
-      guesses: game.guesses.slice(-12).map((g) => (g.isStarter ? { ...g, avatarUrl: hostAvatarUrl } : g)),
+      guesses: game.guesses.slice(-12).map((g) => (g.isStarter ? { ...g, avatarUrl: hostAvatarUrl } : { ...g, avatarUrl: avatarFor(g.caller) || g.avatarUrl })),
       guessesMade: game.guesses.length,
       roundNumber: game.roundNumber,
       // THE SYMBOL ROW shown above the board (null while idle): the slot of every position. It only
@@ -992,6 +1004,10 @@ function handleClientAction(ws, msg) {
       broadcastState();
       break;
     case "get_viewer_roster":
+      ws.emit("viewer_roster", buildRosterPayload());
+      break;
+    case "retry_viewer_pictures":
+      retryMissingPictures();
       ws.emit("viewer_roster", buildRosterPayload());
       break;
     case "set_viewers_selected":

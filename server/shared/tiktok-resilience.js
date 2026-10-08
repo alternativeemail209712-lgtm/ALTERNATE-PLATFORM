@@ -51,10 +51,12 @@ async function throttle() {
   if (at > now) await new Promise((r) => setTimeout(r, at - now));
 }
 
-// Our own look-up of the room id from TikTok's public pages (best effort; TikTok may refuse server IPs).
-export async function pageRoomId(user) {
+// Our own look at TikTok's public pages. Tells us (a) the live room id if one is visible and (b) WHY nothing was found:
+// account not live / account does not exist / TikTok refusing this server / this server cannot reach TikTok.
+export async function probeLive(user) {
   const u = normalizeUser(user);
-  if (!u) return null;
+  const res = { roomId: null, status: null, blocked: false, userFound: false, notFound: false, networkError: null };
+  if (!u) return res;
   const urls = [`https://www.tiktok.com/@${encodeURIComponent(u)}/live`, `https://www.tiktok.com/@${encodeURIComponent(u)}`];
   for (const url of urls) {
     const ctl = new AbortController();
@@ -67,14 +69,23 @@ export async function pageRoomId(user) {
           "Accept": "text/html,application/xhtml+xml", "Accept-Language": "en-US,en;q=0.9"
         }
       });
+      res.status = r.status;
+      if (r.status === 404) { res.notFound = true; continue; }
+      if (r.status === 403 || r.status === 429) { res.blocked = true; continue; }
       if (!r.ok) continue;
       const html = await r.text();
+      if (/captcha|verify to continue|are you a robot|access denied/i.test(html) && !/"uniqueId"/.test(html)) { res.blocked = true; continue; }
+      if (/couldn'?t find this account|"statusCode":10221|"statusCode":10202/i.test(html)) res.notFound = true;
+      if (new RegExp('"uniqueId":"' + u.replace(/[.]/g, "\\.") + '"', "i").test(html)) res.userFound = true;
       const m = html.match(/"roomId":"(\d{10,})"/) || html.match(/"room_id":"?(\d{10,})/) || html.match(/room_id=(\d{10,})/);
-      if (m) return m[1];
-    } catch (_) { /* try next */ } finally { clearTimeout(timer); }
+      if (m) { res.roomId = m[1]; return res; }
+    } catch (e) {
+      res.networkError = String((e && (e.cause && e.cause.code || e.code || e.name)) || "network error");
+    } finally { clearTimeout(timer); }
   }
-  return null;
+  return res;
 }
+export async function pageRoomId(user) { return (await probeLive(user)).roomId; }
 
 const origConnect = TikTokLiveConnection.prototype.connect;
 const origDisconnect = TikTokLiveConnection.prototype.disconnect;
@@ -90,7 +101,7 @@ async function resilientConnect(conn, roomIdArg) {
   };
   if (roomIdArg) return record(await origConnect.call(conn, roomIdArg));
 
-  let lastErr;
+  let lastErr, lastProbe = null;
   const cached = roomCache.get(user);
   if (cached && Date.now() - cached.at < CACHE_MS) {
     try { stats.cacheHits++; return record(await origConnect.call(conn, cached.roomId)); }
@@ -107,7 +118,8 @@ async function resilientConnect(conn, roomIdArg) {
     catch (e) {
       lastErr = e; noteError(e);
       if (!isRoomIdError(e)) throw e;
-      const id = await pageRoomId(user);
+      lastProbe = await probeLive(user);
+      const id = lastProbe.roomId;
       if (id) {
         try { const s = record(await origConnect.call(conn, id)); stats.pageHits++; console.log(`[tiktok] @${user}: connected using the page room-id lookup`); return s; }
         catch (e2) { lastErr = e2; noteError(e2); if (/already/i.test(msgOf(e2))) throw e2; }
@@ -118,6 +130,9 @@ async function resilientConnect(conn, roomIdArg) {
         await sleep(jitter(LOOKUP_RETRY_MS[i]));
       }
     }
+  }
+  if (lastErr && isRoomIdError(lastErr)) {
+    try { lastErr.tiktokDiagnosis = { keySet: Boolean(process.env.EULERSTREAM_API_KEY || process.env.TIKTOK_SIGN_API_KEY), probe: lastProbe, tries: LOOKUP_RETRY_MS.length + 1 }; } catch (_) { /* frozen error */ }
   }
   throw lastErr;
 }
@@ -193,8 +208,13 @@ export function mountTikTokHealth(app) {
       else if (Date.now() - lastCheck < 8000) { out.hints.push("Wait a few seconds between checks."); }
       else {
         lastCheck = Date.now();
-        const id = await pageRoomId(user);
-        out.check = { user, pageRoomIdFound: Boolean(id), roomId: id || null };
+        const probe = await probeLive(user);
+        const id = probe.roomId;
+        out.check = { user, pageRoomIdFound: Boolean(id), roomId: id || null, probe };
+        if (probe.blocked) out.hints.push("TikTok answered this server with HTTP " + probe.status + " / a robot check: TikTok is refusing this server's address.");
+        if (probe.notFound) out.hints.push("TikTok says the account @" + user + " does not exist. Check the spelling.");
+        if (probe.networkError) out.hints.push("This server could not reach tiktok.com (" + probe.networkError + ").");
+        if (probe.userFound && !id) out.hints.push("@" + user + " exists but is not showing as LIVE right now.");
         out.hints.push(id
           ? "TikTok shows @" + user + " as LIVE and this server can read it. Connecting should work."
           : "This server could not read a live room for @" + user + ". Either the account is not LIVE right now, or TikTok is refusing this server's address. Confirm the LIVE is running, wait one minute, try again.");

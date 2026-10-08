@@ -8,6 +8,7 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { TikTokLiveConnection, SignConfig } from "tiktok-live-connector";
+import { explainTikTokError } from "./shared/tiktok-errors.js";
 import { Engagement } from "./engagement/engagement-hub.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -400,26 +401,7 @@ export function registerFlagle(io) {
         }
       }
 
-      const raw = lastErr?.message || String(lastErr);
-      const lower = raw.toLowerCase();
-      let friendly;
-      if (
-        lastErr?.name === "UserOfflineError" ||
-        lower.includes("offline") || lower.includes("not found") ||
-        lower.includes("not currently live") || lower.includes("room id") ||
-        lower.includes("room_id") || lower.includes("roomid") ||
-        lower.includes("user_not_found") || lower.includes("failed to retrieve")
-      ) {
-        friendly = `TikTok reports no live room found for @${clean} right now — almost always because the account isn't currently broadcasting. That's expected, not a problem with your setup. (If you're certain you WERE live, it's occasionally a temporary detection hiccup on TikTok's side — try again in a minute.)`;
-      } else if (lower.includes("rate") || lower.includes("429") || lower.includes("too many")) {
-        friendly = "Hit a rate limit reading TikTok chat. Wait ~30 seconds and try again — or add a free key from eulerstream.com as TIKTOK_SIGN_API_KEY on Render (see README).";
-      } else if (lower.includes("captcha") || lower.includes("blocked") || lower.includes("forbidden") || lower.includes("403")) {
-        friendly = "TikTok is blocking this connection attempt right now. Add a free key from eulerstream.com as TIKTOK_SIGN_API_KEY on Render (see README).";
-      } else if (lower.includes("processinitialdata") || lower.includes("cannot read properties of undefined")) {
-        friendly = "Hit a known bug in the free demo path. Add a free key from eulerstream.com as TIKTOK_SIGN_API_KEY on Render (see README) — this fixes it.";
-      } else {
-        friendly = `Connection attempt failed for a reason other than "not live" (${lastErr?.name || "error"}: ${raw}). Worth reporting if this keeps happening while you ARE live.`;
-      }
+      const friendly = explainTikTokError(lastErr, clean); // update 37: exact reason, not a guess
       socket.emit("tiktok-error", { message: friendly });
     });
 

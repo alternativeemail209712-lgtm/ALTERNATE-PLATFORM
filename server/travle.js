@@ -7,6 +7,7 @@
 // ===================================================================
 
 import { TikTokLiveConnection, WebcastEvent, SignConfig } from "tiktok-live-connector";
+import { explainTikTokError } from "./shared/tiktok-errors.js";
 import { Engagement } from "./engagement/engagement-hub.js";
 
 if (process.env.TIKTOK_SIGN_API_KEY) {
@@ -36,6 +37,10 @@ function extractComment(data) {
 }
 
 function friendlyError(err, username) {
+  return explainTikTokError(err, username);
+}
+// (older generic wording, no longer used)
+function friendlyErrorLegacy(err, username) {
   const raw = err?.message || String(err);
   const lower = raw.toLowerCase();
   // "Not currently live" shows up in several different wordings depending

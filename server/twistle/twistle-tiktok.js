@@ -27,6 +27,7 @@
 // ============================================================================
 
 import { TikTokLiveConnection, WebcastEvent, ControlEvent } from 'tiktok-live-connector';
+import { explainTikTokError } from '../shared/tiktok-errors.js';
 import { extractChatFields, extractMessageId } from './twistle-diagnostics.js';
 import { Engagement } from '../engagement/engagement-hub.js';
 import { resolveHostAvatar, adoptHostAvatar, isHostUser } from '../shared/host-avatar.js';
@@ -249,6 +250,10 @@ function sleep(ms) {
 }
 
 function friendlyConnectError(err, username) {
+  return explainTikTokError(err, username);
+}
+// (older generic wording, no longer used)
+function friendlyConnectErrorLegacy(err, username) {
   const msg = (err && err.message) || String(err);
   if (/offline|not.*live|UserOfflineError/i.test(msg)) {
     return `@${username} does not look like they're LIVE right now.`;

@@ -212,17 +212,27 @@ function remember(name, picture, source) {
   return proxyPath(name, hash);
 }
 
-/** Tries each candidate URL (with heic fixes) until one downloads as a real image. */
-async function firstWorkingPicture(urls) {
+/** Tries each candidate URL (with heic fixes) until one downloads as a real image. Non-HEIC links go first. */
+async function firstWorkingPicture(urls, errs) {
   const tried = new Set();
-  for (const raw of urls) {
+  const rank = (u) => (/\.(heic|heif)(\?|$)/i.test(u) ? 1 : 0);
+  const ordered = [...urls].sort((a, b) => rank(a) - rank(b));
+  for (const raw of ordered) {
     for (const url of urlVariants(raw)) {
-      if (tried.has(url) || !isAllowedUrl(url)) continue;
+      if (tried.has(url)) continue;
+      if (!isAllowedUrl(url)) { if (errs) errs.push("blocked host"); continue; }
       tried.add(url);
-      try {
-        const picture = await downloadImage(url);
-        return { picture, url };
-      } catch (_) { /* next one */ }
+      for (let k = 0; k < 2; k++) {
+        try {
+          const picture = await downloadImage(url);
+          return { picture, url };
+        } catch (e) {
+          const m = String((e && e.message) || e);
+          if (errs) errs.push(m);
+          if (!/timeout|abort|fetch failed|HTTP 5\d\d|ECONN|ENOTFOUND/i.test(m)) break; // not worth a second try
+          await new Promise((r) => setTimeout(r, 400));
+        }
+      }
     }
   }
   return null;
@@ -434,22 +444,79 @@ export function hostAvatarStatus(req, res) {
   );
 }
 
+// ---------------------------------------------------------------- audience: find every viewer + every picture link (update 37)
+
+/** Every picture URL on one TikTok user object (all sizes, all formats). JPEG/WEBP first, HEIC last. */
+export function extractUserAvatarUrls(user) {
+  const found = [];
+  if (!user || typeof user !== "object") return found;
+  for (const [key, value] of Object.entries(user)) {
+    if (/avatar|profile.?pic|portrait/i.test(key)) urlsFromAvatarObject(value, found);
+  }
+  const rank = (u) => (/\.(heic|heif)(\?|$)/i.test(u) ? 1 : 0);
+  return [...new Set(found)].sort((a, b) => rank(a) - rank(b));
+}
+
+/**
+ * Walks ANY TikTok event payload and returns every viewer found in it (chat, join, like, gift, follow, share,
+ * top-viewers lists, ...): [{ u: "username", nick, urls: [pictureLinks] }]. Only real usernames are returned
+ * (never a display name), so a picture can always be matched to the right person.
+ */
+export function collectUserObjects(raw) {
+  const out = new Map();
+  if (!raw || typeof raw !== "object") return [];
+  const queue = [[raw, 0]];
+  let budget = 500;
+  while (queue.length && budget-- > 0) {
+    const [node, depth] = queue.shift();
+    if (!node || typeof node !== "object") continue;
+    if (Array.isArray(node)) {
+      for (const item of node.slice(0, 300)) queue.push([item, depth + 1]);
+      continue;
+    }
+    const id = normalizeHostName(node.uniqueId || node.displayId || node.display_id || node.unique_id || "");
+    if (id && NAME_RE.test(id) && /[a-z0-9]/.test(id)) {
+      const urls = extractUserAvatarUrls(node);
+      if (depth === 0) for (const k of ["profilePictureUrl", "avatarUrl"]) if (isHttpUrl(node[k])) urls.push(node[k]);
+      const nick = String(node.nickname || node.nickName || "").trim();
+      const prev = out.get(id);
+      if (!prev) out.set(id, { u: id, nick, urls: [...new Set(urls)] });
+      else { prev.urls = [...new Set([...prev.urls, ...urls])]; if (!prev.nick && nick) prev.nick = nick; }
+    }
+    if (depth < 5) for (const v of Object.values(node)) if (v && typeof v === "object") queue.push([v, depth + 1]);
+  }
+  return [...out.values()];
+}
+
+function whyPictureFailed(urlCount, errs) {
+  const all = errs.join(" | ");
+  if (!urlCount && /no picture/.test(all)) return "TikTok sent no picture link and the profile page could not be read";
+  if (/HTTP (403|404|410)/.test(all)) return "TikTok refused or expired the picture link";
+  if (/browser-friendly/.test(all)) return "TikTok only offered a HEIC picture";
+  if (/timeout|abort|fetch failed|ECONN|ENOTFOUND/i.test(all)) return "TikTok's picture server did not answer in time";
+  return "the picture could not be downloaded";
+}
+
 /**
  * (update 29) Downloads ANY viewer's profile picture as a real image (used by the SHAPEDLE audience-picture
  * symbols). Tries the picture links TikTok sent with the viewer's event first, then the viewer's public
  * profile page. Returns { buf, type } or null. Never throws. Only TikTok's own picture hosts are contacted.
  */
-export async function downloadViewerPicture(username, rawUrls) {
+export async function downloadViewerPicture(username, rawUrls, report) {
   try {
     const name = normalizeHostName(username);
     const urls = (Array.isArray(rawUrls) ? rawUrls : [rawUrls]).filter(isHttpUrl);
-    let hit = urls.length ? await firstWorkingPicture(urls) : null;
+    const errs = [];
+    let hit = urls.length ? await firstWorkingPicture(urls, errs) : null;
     if (!hit && NAME_RE.test(name)) {
       const pageUrls = await profilePagePictureUrls(name);
-      if (pageUrls.length) hit = await firstWorkingPicture(pageUrls);
+      if (pageUrls.length) hit = await firstWorkingPicture(pageUrls, errs);
+      else errs.push("profile page: no picture");
     }
+    if (!hit && report) report.why = whyPictureFailed(urls.length, errs);
     return hit ? hit.picture : null;
   } catch (_) {
+    if (report) report.why = "the picture could not be downloaded";
     return null;
   }
 }

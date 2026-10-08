@@ -45,6 +45,7 @@ import http from "http";
 import path from "path";
 import { fileURLToPath } from "url";
 import { TikTokLiveConnection, WebcastEvent, SignConfig } from "tiktok-live-connector";
+import { explainTikTokError } from "../shared/tiktok-errors.js";
 import { ANSWER_WORDS, MIN_WORD_LENGTH, MAX_WORD_LENGTH } from "../blindle/blindle-answers.js";
 import { Engagement } from "../engagement/engagement-hub.js";
 import { resolveHostAvatar, adoptHostAvatar, isHostUser } from "../shared/host-avatar.js";
@@ -657,6 +658,7 @@ async function connectToTikTok(username) {
     } catch (err) {
       console.error(`[TikTok] Connect attempt ${attempt + 1} failed:`, err?.message || err);
       diagnostics.retryAttempt = attempt + 1;
+      diagnostics.lastErrorMessage = "Try " + (attempt + 1) + " failed. " + describeConnectError(err);
       const isLastAttempt = attempt === RETRY_DELAYS_MS.length;
       if (isLastAttempt) {
         diagnostics.connectionStatus = "error";
@@ -672,6 +674,10 @@ async function connectToTikTok(username) {
 }
 
 function describeConnectError(err) {
+  return explainTikTokError(err, (typeof diagnostics !== "undefined" && diagnostics && diagnostics.tiktokUsername) || "");
+}
+// (older generic wording, no longer used)
+function describeConnectErrorLegacy(err) {
   const message = String(err?.message || err || "").toLowerCase();
   if (message.includes("not found") || message.includes("does not exist")) {
     return "That TikTok username couldn't be found. Double-check the spelling.";

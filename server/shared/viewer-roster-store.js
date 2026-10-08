@@ -30,7 +30,7 @@ const MAX_VIEWERS = 3000;
 const REFRESH_MS = 3 * 24 * 60 * 60 * 1000; // re-save a picture when it is older than 3 days and the viewer shows up again
 const RETRY_GAP_MS = 45 * 1000;
 const MAX_TRIES = 8;
-const CONCURRENCY = 2;
+const CONCURRENCY = 4;
 
 // u -> { u, n, first, last, sel, hash, type, fetchedAt, rawUrl, tries, lastTry, queued }
 const viewers = new Map();
@@ -57,7 +57,7 @@ function load() {
       if (!validName(u)) continue;
       const v = {
         u, n: String((r && r.n) || u).slice(0, 60), first: Number(r.first) || Date.now(), last: Number(r.last) || Date.now(),
-        sel: Boolean(r.sel), hash: null, type: null, fetchedAt: 0, rawUrl: null, tries: 0, lastTry: 0, queued: false
+        sel: Boolean(r.sel), hash: null, type: null, fetchedAt: 0, rawUrl: null, urls: [], why: "", fresh: false, tries: 0, lastTry: 0, queued: false
       };
       if (r.hash && EXT[r.type]) {
         v.hash = String(r.hash).slice(0, 16);
@@ -123,11 +123,14 @@ export function onRosterChange(fn) {
 }
 
 function needsPicture(v) {
-  if (!v.rawUrl && v.tries > 0 && !v.hash) { /* no link yet: the profile-page fallback may still work */ }
+  // update 37: never gives up for good. The wait between tries grows (45s, 90s ... up to 15 min), and a
+  // fresh picture link from a new event from that person is tried straight away.
   if (v.queued) return false;
-  if (v.tries >= MAX_TRIES && !v.hash) return false;
-  if (Date.now() - v.lastTry < RETRY_GAP_MS) return false;
-  return !v.hash || Date.now() - v.fetchedAt > REFRESH_MS;
+  const now = Date.now();
+  if (v.hash && now - v.fetchedAt <= REFRESH_MS) return false;
+  if (!v.hash && v.fresh && now - v.lastTry >= 5000) return true;
+  const gap = Math.min(RETRY_GAP_MS * Math.pow(2, Math.min(v.tries, 5)), 15 * 60 * 1000);
+  return now - v.lastTry >= gap;
 }
 
 function enqueue(v) {
@@ -150,8 +153,10 @@ function pump() {
 async function fetchPicture(v) {
   try {
     v.lastTry = Date.now();
-    const pic = await downloadViewerPicture(v.u, v.rawUrl ? [v.rawUrl] : []);
-    if (!pic) { v.tries++; return; }
+    v.fresh = false;
+    const report = {};
+    const pic = await downloadViewerPicture(v.u, v.urls && v.urls.length ? v.urls : (v.rawUrl ? [v.rawUrl] : []), report);
+    if (!pic) { v.tries++; v.why = report.why || "the picture could not be downloaded"; changed(); return; }
     const oldPath = v.hash ? picPath(v) : null;
     const next = { ...v, type: pic.type };
     await fs.promises.mkdir(PIC_DIR, { recursive: true });
@@ -161,9 +166,11 @@ async function fetchPicture(v) {
     v.hash = crypto.createHash("sha1").update(pic.buf).digest("hex").slice(0, 10);
     v.fetchedAt = Date.now();
     v.tries = 0;
+    v.why = "";
     changed();
   } catch (e) {
     v.tries++;
+    v.why = "the picture could not be saved on the server";
   } finally {
     v.queued = false;
   }
@@ -186,13 +193,18 @@ export function registerViewer(username, nickname, rawAvatarUrl) {
   let isNew = false;
   if (!v) {
     // new people are ticked automatically (the host can untick or remove anyone)
-    v = { u, n: u, first: now, last: now, sel: true, hash: null, type: null, fetchedAt: 0, rawUrl: null, tries: 0, lastTry: 0, queued: false };
+    v = { u, n: u, first: now, last: now, sel: true, hash: null, type: null, fetchedAt: 0, rawUrl: null, urls: [], why: "", fresh: false, tries: 0, lastTry: 0, queued: false };
     viewers.set(u, v);
     isNew = true;
   }
   const nick = String(nickname || "").trim().slice(0, 60);
   if (nick && nick !== v.n) { v.n = nick; isNew = true; }
-  if (typeof rawAvatarUrl === "string" && /^https?:\/\//i.test(rawAvatarUrl)) v.rawUrl = rawAvatarUrl;
+  // update 37: keep EVERY picture link TikTok sent (all sizes / formats), newest first - not just the first one
+  const given = (Array.isArray(rawAvatarUrl) ? rawAvatarUrl : [rawAvatarUrl]).filter((x) => typeof x === "string" && /^https?:\/\//i.test(x));
+  if (given.length) {
+    const merged = [...new Set([...given, ...(v.urls || [])])].slice(0, 8);
+    if (!v.urls || merged.join("|") !== v.urls.join("|")) { v.urls = merged; if (!v.hash) v.fresh = true; }
+  }
   // "last seen" is only written to disk with the next real change (avoids a disk write per chat line)
   v.last = now;
   enqueue(v);
@@ -231,6 +243,21 @@ export function allowRemovedViewers() {
   changed();
 }
 
+/** (update 37) Forget the waiting times and try every viewer who has no saved picture again, right now. */
+export function retryMissingPictures() {
+  let n = 0;
+  for (const v of viewers.values()) {
+    if (v.hash) continue;
+    v.tries = 0; v.lastTry = 0; v.fresh = true; v.queued = false;
+    enqueue(v); n++;
+  }
+  return n;
+}
+
+// a slow background sweep: anyone still without a picture keeps being retried, even if they never write again
+const sweepTimer = setInterval(() => { for (const v of viewers.values()) enqueue(v); }, 30000);
+if (sweepTimer.unref) sweepTimer.unref();
+
 export function setViewersSelected(usernames, on) {
   let any = false;
   for (const name of Array.isArray(usernames) ? usernames.slice(0, 5000) : []) {
@@ -253,7 +280,7 @@ export function setAllViewersSelected(on, onlyWithPicture) {
 export function listViewers() {
   return [...viewers.values()]
     .sort((a, b) => b.last - a.last)
-    .map((v) => ({ u: v.u, n: v.n, first: v.first, last: v.last, sel: v.sel, ready: Boolean(v.hash), v: v.hash || "" }));
+    .map((v) => ({ u: v.u, n: v.n, first: v.first, last: v.last, sel: v.sel, ready: Boolean(v.hash), v: v.hash || "", why: v.hash ? "" : (v.why || "") }));
 }
 
 export function viewerCounts() {
