@@ -1,83 +1,207 @@
-/* UPDATE 34 - HOME layouts (13), search, category chips, Surprise me. Never edits the cards' content; works alongside home.js. */
+/* UPDATE 35 - HOME: 35 layouts, host-made groups, search, keyboard + touch. Never edits the cards' content; works alongside home.js. */
 (function () {
   "use strict";
   var hub = document.querySelector(".hub"), strip = document.querySelector(".feature-strip"), footer = document.querySelector(".hub-footer");
   if (!hub || !strip || !footer) return;
-  var DEFAULT_VIEW = "cards"; // <- change to make another layout the first one new visitors see (id from VIEWS below)
-  var cats = {
-    Geography: ["flagle", "travle"],
-    "Word clues": ["blindle", "oracle", "rangedle", "structle", "codedle"],
-    "Colour & symbols": ["colorblindle", "colordle", "shapedle", "twistle"],
-    Puzzles: ["findle", "crossdle", "textle"]
-  };
+  document.body.classList.add("hv-on");
+  var DEFAULT_VIEW = "cards"; // <- first layout new visitors see (any id below)
   var NEW_GAMES = ["shapedle"]; // ids that show a NEW tag
-  var VIEWS = [["cards","🃏","Cards"],["grid","▦","Grid"],["list","☰","List"],["icons","🔳","Icons"],["swipe","👉","Swipe"],["mosaic","🧩","Mosaic"],["hero","⭐","Hero"],["pills","💊","Pills"],["fold","📂","Fold"],["bubbles","🫧","Bubbles"],["arcade","🕹️","Arcade"],["sections","🗂️","Sections"],["bands","🎽","Bands"]];
-  var STAGE = { swipe: 1, hero: 1, sections: 1 };
-  var LS = "homeView.v2";
-  function cards() { return Array.prototype.slice.call(document.querySelectorAll(".game-card[data-game]")); }
-  function visible() { return cards().filter(function (c) { return !c.hidden && !c.classList.contains("hv-filtered"); }); }
-  function catOf(id) { for (var k in cats) if (cats[k].indexOf(id) > -1) return k; return "Other"; }
-  function el(t, c, txt) { var e = document.createElement(t); if (c) e.className = c; if (txt) e.textContent = txt; return e; }
-  function ok(v) { return VIEWS.some(function (x) { return x[0] === v; }); }
+  var VIEWS = [["cards","🃏","Cards"],["grid","▦","Grid"],["list","☰","List"],["icons","🔳","Icons"],["swipe","👉","Swipe"],["mosaic","🧩","Mosaic"],["hero","⭐","Hero"],["pills","💊","Pills"],["fold","📂","Fold"],["bubbles","🫧","Bubbles"],["arcade","🕹️","Arcade"],["sections","🗂️","Sections"],["bands","🎽","Bands"],
+    ["trio","3️⃣","Trio"],["quad","4️⃣","Quad"],["posters","🎬","Posters"],["wide","🛣️","Wide"],["masonry","🧱","Masonry"],["stripes","🦓","Stripes"],["minimal","✨","Minimal"],["stickers","🏷️","Stickers"],["glass","🪟","Glass"],["night","🌙","Night"],["terminal","💻","Terminal"],["cartridge","👾","Cartridge"],["ticket","🎟️","Ticket"],["polaroid","📷","Polaroid"],["gradient","🌈","Gradient"],["zigzag","↯","Zigzag"],["ranked","🏅","Ranked"],["table","📊","Table"],["stories","🔵","Stories"],["tabs","🗃️","Tabs"],["spotlight","🔦","Spotlight"],["folders","📁","Folders"]];
+  var STAGE = { swipe:1, hero:1, sections:1, masonry:1, stories:1, tabs:1, spotlight:1, folders:1 };
+  var TILE = "grid mosaic arcade glass gradient cartridge polaroid stickers".split(" ");
+  var ROW = "list bands stripes night ticket table ranked minimal terminal wide".split(" ");
+  var LS = "homeView.v3", GK = "homeGroups.v1", EK = "homeCards.editKey";
 
-  var view = DEFAULT_VIEW, cat = "All";
+  function $c() { return Array.prototype.slice.call(document.querySelectorAll(".game-card[data-game]")); }
+  function gid(c) { return c.getAttribute("data-game"); }
+  function visible() { return $c().filter(function (c) { return !c.hidden && !c.classList.contains("hv-filtered"); }); }
+  function el(t, c, txt) { var e = document.createElement(t); if (c) e.className = c; if (txt != null) e.textContent = txt; return e; }
+  function vInfo(id) { for (var i = 0; i < VIEWS.length; i++) if (VIEWS[i][0] === id) return VIEWS[i]; return null; }
+  function title(c) { var n = c.querySelector(".game-name"); return n ? n.textContent.trim() : gid(c); }
+  function icon(c) { var n = c.querySelector(".game-icon"); return n ? n.textContent.trim() : "🎮"; }
+
+  var view = DEFAULT_VIEW, cat = "All", tabSel = 0, spotI = 0;
   try { view = localStorage.getItem(LS) || DEFAULT_VIEW; } catch (e) {}
   try { var qv = new URLSearchParams(location.search).get("view"); if (qv) view = qv; } catch (e) {}
-  if (!ok(view)) view = "cards";
+  if (!vInfo(view)) view = "cards";
 
-  var bar = el("div", "hv-bar"), views = el("div", "hv-views"), chipsBox = el("div", "hv-chips");
-  var search = el("input", "hv-search"); search.type = "search"; search.placeholder = "🔎 Search games...";
+  /* ================= host groups ================= */
+  var groups = { groups: [], updatedAt: 0 };
+  function cleanG(x) {
+    var ids = $c().map(gid), used = {}, out = [];
+    ((x && x.groups) || []).forEach(function (g) {
+      if (!g || out.length >= 12) return;
+      var name = String(g.name || "").replace(/\s+/g, " ").trim().slice(0, 24); if (!name) return;
+      var id = String(g.id || "").replace(/[^a-z0-9_-]/gi, "").slice(0, 20) || "g" + Math.random().toString(36).slice(2, 8);
+      var games = [];
+      (g.games || []).forEach(function (k) { if (ids.indexOf(k) > -1 && !used[k]) { used[k] = 1; games.push(k); } });
+      out.push({ id: id, name: name, games: games });
+    });
+    return { groups: out, updatedAt: Number(x && x.updatedAt) || 0 };
+  }
+  try { groups = cleanG(JSON.parse(localStorage.getItem(GK) || "{}")); } catch (e) {}
+  function saveLocal() { try { localStorage.setItem(GK, JSON.stringify(groups)); } catch (e) {} }
+  function groupOf(id) { for (var i = 0; i < groups.groups.length; i++) if (groups.groups[i].games.indexOf(id) > -1) return groups.groups[i]; return null; }
+  var pushT = null, statusEl = null;
+  function setStatus(t) { if (statusEl) statusEl.textContent = t; }
+  function push() {
+    var headers = { "Content-Type": "application/json" }, key = "";
+    try { key = localStorage.getItem(EK) || ""; } catch (e) {}
+    if (key) headers["x-edit-key"] = key;
+    fetch("/api/home-groups", { method: "PUT", headers: headers, body: JSON.stringify({ groups: groups.groups }) })
+      .then(function (r) {
+        if (r.status === 401) {
+          var k = window.prompt("This site needs the HOME edit key to save your groups for all devices:");
+          if (k) { try { localStorage.setItem(EK, k); } catch (e) {} push(); } else setStatus("Saved on this device only.");
+          return null;
+        }
+        return r.ok ? r.json() : null;
+      })
+      .then(function (s) { if (s) { groups.updatedAt = Number(s.updatedAt) || groups.updatedAt; saveLocal(); setStatus("Saved ✓ (all your devices)"); } })
+      .catch(function () { setStatus("Saved on this device only (server not reachable)."); });
+  }
+  function changed() {
+    groups = cleanG(groups); groups.updatedAt = Date.now(); saveLocal();
+    if (cat !== "All" && cat !== "_none" && !groups.groups.some(function (g) { return g.id === cat; })) cat = "All";
+    buildChips(); apply(true); setStatus("Saving...");
+    clearTimeout(pushT); pushT = setTimeout(push, 400);
+  }
+  function adopt(s, initial) {
+    if (!s) return;
+    var c = cleanG(s);
+    if (c.updatedAt > groups.updatedAt) { groups = c; saveLocal(); buildChips(); apply(true); }
+    else if (initial && groups.groups.length && groups.updatedAt > c.updatedAt) push();
+  }
+  function pull() { fetch("/api/home-groups", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (s) { adopt(s, true); }).catch(function () {}); }
+  try { if (typeof window.io === "function") window.io("/home-hub").on("home:groups", function (s) { adopt(s, false); }); } catch (e) {}
+
+  /* ================= bar ================= */
+  var bar = el("div", "hv-bar"), r1 = el("div", "hv-r1"), chipsBox = el("div", "hv-chips");
+  var pickBtn = el("button", "hv-pickbtn"), prevB = el("button", "hv-sq", "‹"), nextB = el("button", "hv-sq", "›"), grpB = el("button", "hv-sq grp");
+  pickBtn.type = prevB.type = nextB.type = grpB.type = "button";
+  prevB.title = "Previous layout ( [ )"; nextB.title = "Next layout ( ] )"; pickBtn.title = "Choose a layout";
+  grpB.innerHTML = "🗂️ <span>Groups</span>"; grpB.title = "Make your own groups";
+  [pickBtn, prevB, nextB, grpB].forEach(function (b) { r1.appendChild(b); });
+  var search = el("input", "hv-search"); search.type = "search"; search.placeholder = "🔎 Search games...  ( press / )";
   var count = el("div", "hv-count"), empty = el("div", "hv-empty", "No games match. Try another word."); empty.hidden = true;
-  var rnd = el("button", "hv-random", "🎲 Surprise me"); rnd.type = "button";
   var stage = el("div", "hv-stage");
-
-  VIEWS.forEach(function (v) {
-    var b = el("button", "hv-view"); b.type = "button"; b.dataset.v = v[0];
-    b.innerHTML = "<b>" + v[1] + "</b><small>" + v[2] + "</small>";
-    b.onclick = function () { setView(v[0]); };
-    views.appendChild(b);
-  });
-  ["All"].concat(Object.keys(cats)).forEach(function (c) {
-    var b = el("button", "hv-chip", c); b.type = "button";
-    b.onclick = function () { cat = c; apply(); };
-    chipsBox.appendChild(b);
-  });
-  bar.appendChild(views); bar.appendChild(search); bar.appendChild(chipsBox); bar.appendChild(count);
+  bar.appendChild(r1); bar.appendChild(search); bar.appendChild(chipsBox); bar.appendChild(count);
   strip.parentNode.insertBefore(bar, strip.nextSibling);
-  bar.parentNode.insertBefore(rnd, bar.nextSibling);
-  hub.insertBefore(stage, footer);
-  hub.insertBefore(empty, footer);
+  hub.insertBefore(stage, footer); hub.insertBefore(empty, footer);
+  $c().forEach(function (c) { if (NEW_GAMES.indexOf(gid(c)) > -1) c.appendChild(el("span", "hv-tagnew", "NEW")); });
 
-  cards().forEach(function (c) {
-    if (NEW_GAMES.indexOf(c.getAttribute("data-game")) > -1) c.appendChild(el("span", "hv-tagnew", "NEW"));
-  });
+  function buildChips() {
+    chipsBox.innerHTML = "";
+    chipsBox.hidden = !groups.groups.length;
+    if (!groups.groups.length) { cat = "All"; return; }
+    function chip(id, name) {
+      var b = el("button", "hv-chip" + (cat === id ? " on" : ""), name); b.type = "button";
+      b.onclick = function () { cat = id; buildChips(); apply(true); };
+      chipsBox.appendChild(b);
+    }
+    chip("All", "All");
+    groups.groups.forEach(function (g) { chip(g.id, g.name); });
+    if ($c().some(function (c) { return !groupOf(gid(c)); })) chip("_none", "Other");
+  }
 
+  /* ================= modal helpers ================= */
+  var ov = el("div", "hv-ov"); ov.hidden = true; document.body.appendChild(ov);
+  ov.addEventListener("click", function (e) { if (e.target === ov) closeOv(); });
+  function closeOv() { ov.hidden = true; statusEl = null; }
+  function showOv(node) { ov.innerHTML = ""; ov.appendChild(node); ov.hidden = false; }
+  function mHead(t) { var h = el("div", "hv-mh"), x = el("button", "hv-x", "✕"); x.type = "button"; x.onclick = closeOv; h.appendChild(el("h2", "", t)); h.appendChild(x); return h; }
+
+  function openPicker() {
+    var m = el("div", "hv-modal"), g = el("div", "hv-pg");
+    m.appendChild(mHead("Choose a layout (" + VIEWS.length + ")"));
+    VIEWS.forEach(function (v) {
+      var b = el("button", "hv-pi" + (v[0] === view ? " on" : "")); b.type = "button";
+      b.innerHTML = "<b>" + v[1] + "</b>" + v[2];
+      b.onclick = function () { setView(v[0]); closeOv(); };
+      g.appendChild(b);
+    });
+    m.appendChild(g);
+    m.appendChild(el("div", "hv-keys", "Keyboard: [ and ] change layout · / search · Esc close"));
+    showOv(m);
+  }
+  function step(d) { var i = 0; VIEWS.forEach(function (v, k) { if (v[0] === view) i = k; }); setView(VIEWS[(i + d + VIEWS.length) % VIEWS.length][0]); }
+  pickBtn.onclick = openPicker; prevB.onclick = function () { step(-1); }; nextB.onclick = function () { step(1); };
+
+  function openGroups() {
+    var m = el("div", "hv-modal");
+    function draw() {
+      m.innerHTML = ""; m.appendChild(mHead("🗂️ My groups"));
+      m.appendChild(el("p", "hv-help", "Make your own groups (for example Geography, Easy, Kids, Today's stream) and put each game in one. They appear as filter buttons on the home page and as headings in the Sections, Hero, Tabs and Folders layouts."));
+      groups.groups.forEach(function (g, i) {
+        var row = el("div", "hv-gr"), inp = el("input"); inp.value = g.name; inp.maxLength = 24; inp.setAttribute("aria-label", "Group name");
+        inp.onchange = function () { g.name = inp.value.trim() || g.name; changed(); draw(); };
+        var up = el("button", "", "↑"), dn = el("button", "", "↓"), rm = el("button", "", "✕");
+        up.type = dn.type = rm.type = "button"; up.title = "Move up"; dn.title = "Move down"; rm.title = "Delete group";
+        up.onclick = function () { if (i > 0) { groups.groups.splice(i - 1, 0, groups.groups.splice(i, 1)[0]); changed(); draw(); } };
+        dn.onclick = function () { if (i < groups.groups.length - 1) { groups.groups.splice(i + 1, 0, groups.groups.splice(i, 1)[0]); changed(); draw(); } };
+        rm.onclick = function () { if (window.confirm("Delete the group \"" + g.name + "\"? Its games stay on the page.")) { groups.groups.splice(i, 1); changed(); draw(); } };
+        row.appendChild(inp); row.appendChild(up); row.appendChild(dn); row.appendChild(rm); m.appendChild(row);
+      });
+      var add = el("button", "hv-add", "＋ Add a group"); add.type = "button";
+      add.onclick = function () {
+        if (groups.groups.length >= 12) return;
+        groups.groups.push({ id: "g" + Date.now().toString(36), name: "New group", games: [] }); changed(); draw();
+        var ins = m.querySelectorAll(".hv-gr input"); if (ins.length) { ins[ins.length - 1].focus(); ins[ins.length - 1].select(); }
+      };
+      m.appendChild(add);
+      if (groups.groups.length) {
+        m.appendChild(el("div", "hv-ah", "Put each game in a group:"));
+        $c().forEach(function (c) {
+          var row = el("div", "hv-ag"), sel = el("select"), cur = groupOf(gid(c));
+          row.appendChild(el("span", "", icon(c) + "  " + title(c)));
+          var o0 = el("option", "", "— no group —"); o0.value = ""; sel.appendChild(o0);
+          groups.groups.forEach(function (g) { var o = el("option", "", g.name); o.value = g.id; if (cur && cur.id === g.id) o.selected = true; sel.appendChild(o); });
+          sel.setAttribute("aria-label", "Group for " + title(c));
+          sel.onchange = function () {
+            groups.groups.forEach(function (g) { g.games = g.games.filter(function (k) { return k !== gid(c); }); });
+            groups.groups.forEach(function (g) { if (g.id === sel.value) g.games.push(gid(c)); });
+            changed();
+          };
+          row.appendChild(sel); m.appendChild(row);
+        });
+      }
+      statusEl = el("div", "hv-status"); m.appendChild(statusEl);
+      var done = el("button", "hv-done", "Done"); done.type = "button"; done.onclick = closeOv; m.appendChild(done);
+    }
+    draw(); showOv(m);
+  }
+  grpB.onclick = openGroups;
+
+  /* ================= views ================= */
   function setView(v) {
     view = v;
     try { localStorage.setItem(LS, v); } catch (e) {}
-    hub.className = hub.className.replace(/\bv-\w+/g, "").trim() + " v-" + v;
-    document.body.classList.toggle("hv-arcade", v === "arcade");
-    Array.prototype.forEach.call(views.children, function (b) {
-      var on = b.dataset.v === v; b.classList.toggle("on", on);
-      if (on && b.scrollIntoView) { try { views.scrollTo({ left: b.offsetLeft - 20, behavior: "smooth" }); } catch (e) {} }
-    });
-    cards().forEach(function (c) { c.classList.remove("hv-open"); });
+    var k = TILE.indexOf(v) > -1 ? " k-tile" : ROW.indexOf(v) > -1 ? " k-row" : "";
+    hub.className = "hub " + (STAGE[v] ? "hv-s" : "hv-g") + " v-" + v + k;
+    document.body.setAttribute("data-hv", v);
+    var i = vInfo(v); pickBtn.innerHTML = i[1] + " " + i[2] + "<small>layout ▾</small>";
+    $c().forEach(function (c) { c.classList.remove("hv-open"); });
     renderStage(true);
   }
-
-  /* ---- stage layouts: built from clones of the visible cards (originals stay for the customizer) ---- */
   var lastSig = "", car = null, dots = null;
-  function sig() { return visible().map(function (c) { return c.getAttribute("data-game") + c.getAttribute("style") + c.textContent.length; }).join("|"); }
+  function sig() { return visible().map(function (c) { return gid(c) + c.getAttribute("style") + c.textContent.length; }).join("|") + view + tabSel + spotI; }
   function clone(c, cls) {
-    var n = c.cloneNode(true); n.removeAttribute("data-game"); n.classList.add("hv-clone", cls); return n;
+    var n = c.cloneNode(true); n.removeAttribute("data-game");
+    n.classList.remove("hv-first", "hv-odd", "hv-filtered", "hv-open"); n.classList.add("hv-clone", cls); return n;
   }
-  function groups(list) {
-    var order = Object.keys(cats).concat("Other"), out = [];
-    order.forEach(function (k) {
-      var items = list.filter(function (c) { return catOf(c.getAttribute("data-game")) === k; });
-      if (items.length) out.push([k, items]);
+  function buckets(list) {
+    var out = [];
+    groups.groups.forEach(function (g) {
+      var it = list.filter(function (c) { return g.games.indexOf(gid(c)) > -1; });
+      if (it.length) out.push([g.name, it]);
     });
+    var rest = list.filter(function (c) { return !groupOf(gid(c)); });
+    if (rest.length) out.push([groups.groups.length ? "Other games" : "All games", rest]);
     return out;
+  }
+  function grid(items, cls, kind) {
+    var g = el("div", "hv-gc " + (kind || "")); items.forEach(function (c) { g.appendChild(clone(c, cls)); }); return g;
   }
   function updDots() {
     if (!car || !dots) return;
@@ -90,91 +214,130 @@
     var s = sig(); if (!force && s === lastSig) return; lastSig = s;
     var list = visible(); stage.innerHTML = ""; car = dots = null;
     if (!list.length) return;
+    var bk = buckets(list);
     if (view === "swipe") {
-      car = el("div", "hv-car"); dots = el("div", "hv-dots");
+      var w = el("div", "hv-carwrap"); car = el("div", "hv-car"); dots = el("div", "hv-dots");
       list.forEach(function (c) { car.appendChild(clone(c, "hv-slide")); dots.appendChild(el("i")); });
-      stage.appendChild(car); stage.appendChild(dots);
+      var L = el("button", "hv-nb l", "‹"), R = el("button", "hv-nb r", "›"); L.type = R.type = "button";
+      L.onclick = function () { car.scrollBy({ left: -car.clientWidth * .8, behavior: "smooth" }); };
+      R.onclick = function () { car.scrollBy({ left: car.clientWidth * .8, behavior: "smooth" }); };
+      w.appendChild(car); w.appendChild(L); w.appendChild(R); stage.appendChild(w); stage.appendChild(dots);
       car.addEventListener("scroll", updDots); setTimeout(updDots, 50);
     } else if (view === "hero") {
       var h = clone(list[0], "hv-hero"), nm = h.querySelector(".game-name");
       if (nm) nm.appendChild(el("span", "hv-herobadge", "⭐ FEATURED"));
       stage.appendChild(h);
-      groups(list.slice(1)).forEach(function (g) {
-        stage.appendChild(el("h3", "hv-sec", g[0] + " · " + g[1].length));
-        var row = el("div", "hv-row");
-        g[1].forEach(function (c) { row.appendChild(clone(c, "hv-poster")); });
-        stage.appendChild(row);
+      buckets(list.slice(1)).forEach(function (b) {
+        stage.appendChild(el("h3", "hv-sec", b[0] + " · " + b[1].length));
+        var row = el("div", "hv-rowx"); b[1].forEach(function (c) { row.appendChild(clone(c, "hv-poster")); }); stage.appendChild(row);
       });
     } else if (view === "sections") {
-      groups(list).forEach(function (g) {
-        stage.appendChild(el("h3", "hv-sec", g[0] + " · " + g[1].length));
-        var grid = el("div", "hv-secgrid");
-        g[1].forEach(function (c) { grid.appendChild(clone(c, "hv-mini")); });
-        stage.appendChild(grid);
+      bk.forEach(function (b) { stage.appendChild(el("h3", "hv-sec", b[0] + " · " + b[1].length)); stage.appendChild(grid(b[1], "hv-mini")); });
+    } else if (view === "masonry") {
+      stage.appendChild(grid(list, "hv-mas", "mas"));
+    } else if (view === "stories") {
+      var st = el("div", "hv-stories");
+      list.forEach(function (c) {
+        var cs = getComputedStyle(c), a = el("a", "hv-story"); a.href = c.getAttribute("href");
+        a.style.setProperty("--c", cs.getPropertyValue("--accent") || "#999"); a.style.setProperty("--d", cs.getPropertyValue("--accent-deep") || "#555");
+        a.appendChild(el("i", "", icon(c))); a.appendChild(el("span", "", title(c))); st.appendChild(a);
+      });
+      stage.appendChild(st); stage.appendChild(grid(list, "hv-listrow", "rows"));
+    } else if (view === "tabs") {
+      if (tabSel >= bk.length) tabSel = 0;
+      if (bk.length > 1) {
+        var tb = el("div", "hv-tabs");
+        bk.forEach(function (b, i) {
+          var t = el("button", "hv-tab" + (i === tabSel ? " on" : ""), b[0] + " (" + b[1].length + ")"); t.type = "button";
+          t.onclick = function () { tabSel = i; renderStage(true); }; tb.appendChild(t);
+        });
+        stage.appendChild(tb);
+      }
+      stage.appendChild(grid(bk[tabSel][1], "hv-mini"));
+    } else if (view === "spotlight") {
+      if (spotI >= list.length) spotI = 0;
+      var sp = el("div", "hv-spot"), main = el("div", "hv-spotmain"), pv = el("button", "hv-sn", "‹"), nx = el("button", "hv-sn", "›");
+      pv.type = nx.type = "button"; pv.onclick = function () { spotI = (spotI - 1 + list.length) % list.length; renderStage(true); };
+      nx.onclick = function () { spotI = (spotI + 1) % list.length; renderStage(true); };
+      main.appendChild(pv); main.appendChild(clone(list[spotI], "hv-hero")); main.appendChild(nx);
+      var th = el("div", "hv-thumbs");
+      list.forEach(function (c, i) {
+        var b = el("button", "hv-th" + (i === spotI ? " on" : "")); b.type = "button";
+        b.innerHTML = "<b></b><span></span>"; b.firstChild.textContent = icon(c); b.lastChild.textContent = title(c);
+        b.onclick = function () { spotI = i; renderStage(true); }; th.appendChild(b);
+      });
+      sp.appendChild(main); sp.appendChild(th); stage.appendChild(sp);
+    } else if (view === "folders") {
+      bk.forEach(function (b) {
+        var d = el("details", "hv-fd"); d.open = true; d.appendChild(el("summary", "", b[0] + " · " + b[1].length));
+        d.appendChild(grid(b[1], "hv-mini")); stage.appendChild(d);
       });
     }
   }
 
-  function apply() {
-    var q = search.value.trim().toLowerCase(), shown = 0, total = 0, first = null;
-    cards().forEach(function (c) {
-      var id = c.getAttribute("data-game");
-      var good = (cat === "All" || catOf(id) === cat) && (!q || c.textContent.toLowerCase().indexOf(q) > -1);
-      c.classList.toggle("hv-filtered", !good);
-      c.classList.remove("hv-first");
-      if (!c.hidden) { total++; if (good) { shown++; if (!first) first = c; } }
+  function apply(force) {
+    var q = search.value.trim().toLowerCase(), shown = 0, total = 0, first = null, idx = 0;
+    $c().forEach(function (c) {
+      var g = groupOf(gid(c));
+      var inCat = cat === "All" || (cat === "_none" ? !g : g && g.id === cat);
+      var good = inCat && (!q || c.textContent.toLowerCase().indexOf(q) > -1);
+      c.classList.toggle("hv-filtered", !good); c.classList.remove("hv-first", "hv-odd");
+      if (!c.hidden) { total++; if (good) { shown++; if (!first) first = c; if (idx++ % 2) c.classList.add("hv-odd"); } }
     });
     if (first) first.classList.add("hv-first");
-    Array.prototype.forEach.call(chipsBox.children, function (b) { b.classList.toggle("on", b.textContent === cat); });
     count.textContent = shown + " of " + total + " games";
     empty.hidden = shown > 0;
-    renderStage(false);
+    renderStage(!!force);
   }
-  search.addEventListener("input", apply);
-  rnd.onclick = function () {
-    var list = visible();
-    if (list.length) location.href = list[Math.floor(Math.random() * list.length)].getAttribute("href");
-  };
+  search.addEventListener("input", function () { apply(true); });
 
-  /* ---- icons: details sheet / fold: expand in place ---- */
-  var ov = el("div", "hv-sheet-o"); ov.hidden = true; document.body.appendChild(ov);
-  ov.addEventListener("click", function (e) { if (e.target === ov) ov.hidden = true; });
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape") ov.hidden = true; });
-  function openSheet(c) {
-    var cs = getComputedStyle(c), s = el("div", "hv-sheet");
-    s.style.setProperty("--hv-c", cs.getPropertyValue("--accent") || "#999");
-    s.style.setProperty("--hv-d", cs.getPropertyValue("--accent-deep") || "#555");
-    s.appendChild(el("h2", "", c.querySelector(".game-icon").textContent + " " + c.querySelector(".game-name").textContent));
-    s.appendChild(el("p", "", c.querySelector(".game-desc").textContent));
-    var tg = el("div", "tags");
-    Array.prototype.forEach.call(c.querySelectorAll(".tag"), function (t) { tg.appendChild(el("span", "", t.textContent)); });
-    s.appendChild(tg);
-    var a = el("a", "go", c.querySelector(".play-cta").textContent); a.href = c.getAttribute("href");
-    s.appendChild(a);
-    ov.innerHTML = ""; ov.appendChild(s); ov.hidden = false;
-  }
+  /* icons: details sheet / fold: expand in place */
   hub.addEventListener("click", function (e) {
     var c = e.target.closest && e.target.closest(".game-card[data-game]");
     if (!c) return;
-    if (view === "icons") { e.preventDefault(); openSheet(c); }
-    else if (view === "fold") {
+    if (view === "icons") {
+      e.preventDefault();
+      var cs = getComputedStyle(c), s = el("div", "hv-sheet");
+      s.style.setProperty("--hv-c", cs.getPropertyValue("--accent") || "#999"); s.style.setProperty("--hv-d", cs.getPropertyValue("--accent-deep") || "#555");
+      var h = el("div", "hv-mh"), x = el("button", "hv-x", "✕"); x.type = "button"; x.onclick = closeOv;
+      h.appendChild(el("h2", "", icon(c) + " " + title(c))); h.appendChild(x); s.appendChild(h);
+      s.appendChild(el("p", "", c.querySelector(".game-desc").textContent));
+      var tg = el("div", "tags");
+      Array.prototype.forEach.call(c.querySelectorAll(".tag"), function (t) { tg.appendChild(el("span", "", t.textContent)); });
+      s.appendChild(tg);
+      var a = el("a", "go", c.querySelector(".play-cta").textContent); a.href = c.getAttribute("href"); s.appendChild(a);
+      showOv(s);
+    } else if (view === "fold") {
       if (c.classList.contains("hv-open") && e.target.closest(".play-cta")) return;
       e.preventDefault();
       var was = c.classList.contains("hv-open");
-      cards().forEach(function (x) { x.classList.remove("hv-open"); });
+      $c().forEach(function (k) { k.classList.remove("hv-open"); });
       if (!was) c.classList.add("hv-open");
     }
   });
 
-  /* ---- keep in sync when the customizer hides / recolors / reorders cards ---- */
+  /* keyboard (desktop) */
+  document.addEventListener("keydown", function (e) {
+    var typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target && e.target.tagName) || "");
+    if (e.key === "Escape") { if (!ov.hidden) closeOv(); else if (e.target === search && search.value) { search.value = ""; apply(true); } return; }
+    if (typing || e.ctrlKey || e.metaKey || e.altKey || !ov.hidden) return;
+    if (e.key === "/") { e.preventDefault(); search.focus(); }
+    else if (e.key === "[") step(-1);
+    else if (e.key === "]") step(1);
+    else if (view === "spotlight" && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+      var n = visible().length; if (n) { spotI = (spotI + (e.key === "ArrowRight" ? 1 : -1) + n) % n; renderStage(true); }
+    }
+  });
+
+  /* stay in sync with the card customizer (hide / recolor / reorder) */
   var t = null;
-  function later() { clearTimeout(t); t = setTimeout(apply, 150); }
+  function later() { clearTimeout(t); t = setTimeout(function () { apply(false); }, 150); }
   if (window.MutationObserver) {
     var mo = new MutationObserver(later);
-    cards().forEach(function (c) { mo.observe(c, { attributes: true, attributeFilter: ["style", "hidden"] }); });
+    $c().forEach(function (c) { mo.observe(c, { attributes: true, attributeFilter: ["style", "hidden"] }); });
     mo.observe(hub, { childList: true });
   }
 
-  setView(view); apply();
-  setTimeout(apply, 600); setTimeout(apply, 2500);
+  buildChips(); setView(view); apply(true); pull();
+  setTimeout(function () { apply(false); }, 600); setTimeout(function () { apply(false); }, 2500);
 })();

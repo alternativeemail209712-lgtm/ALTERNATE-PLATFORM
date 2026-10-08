@@ -61,6 +61,7 @@ import { LegendHub } from "./server/shared/legend-hub.js";
 import { serveHostAvatar, hostAvatarStatus } from "./server/shared/host-avatar.js";
 import { HostPresence } from "./server/shared/host-presence.js";
 import { mountHomeCards } from "./server/shared/home-cards-store.js";
+import { mountHomeGroups } from "./server/shared/home-groups-store.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -90,6 +91,7 @@ app.get("/host-avatar-status/:name", hostAvatarStatus);
 // and server/shared/home-cards-store.js. Both use the Socket.IO namespace /home-hub.
 HostPresence.init(io, app);
 mountHomeCards(app, io, express);
+mountHomeGroups(app, io, express);
 
 // Serves /public/index.html at "/", and transparently serves
 // /public/flagle/*, /public/travle/*, /public/crossdle/*, and
