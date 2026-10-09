@@ -1,4 +1,5 @@
 # TikTok LIVE Game Platform
+> **Update 39:** guess tiles no longer shrink as guesses pile up - the board scrolls (auto-scroll + manual), and a Settings switch turns tile auto-resizing on/off for long words - see `CHANGES_UPDATE_39.md`.
 > **Update 38:** HOME now has a platform-wide **Offline / Test / Live** switch (⚙️ Home settings → Mode), ONE shared TikTok connection for every game, and a floating connection window with detailed status and exact reasons. "Customize Game Cards" moved to ⚙️ Home settings → Cards - see `CHANGES_UPDATE_38.md`.
 > **Update 32:** SHAPEDLE audience profile pictures are ticked automatically (untick or remove anyone), and the legend entries (order, text, colors) always apply - see `CHANGES_UPDATE_32.md`.
 > **Update 31:** the legend settings are now called **LEGENDS SETTINGS**, with new positions (directly above / below the keyboard) and an exact rows x columns layout - see `CHANGES_UPDATE_31.md`.

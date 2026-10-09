@@ -413,3 +413,6 @@ button { cursor: pointer; }
 .celebrationDots { display: flex; justify-content: center; gap: 6px; margin-top: 18px; }
 .celebDot { width: 6px; height: 6px; border-radius: 50%; background: rgba(140, 150, 255, 0.28); }
 .celebDot.active { background: var(--pink); }
+
+/* update 39: when tiles keep a fixed size, a long row scrolls sideways - keep its start reachable (centered overflow would clip the left side) */
+.guessRow { justify-content: safe center; }

@@ -708,11 +708,14 @@ function fitLine(n, W, cap, gap) {
 
 function computeLayout(n, W) {
   const usable = Math.max(60, W - AVATAR_RESERVE);
+  // update 39: with "Auto-resize tiles" switched off, a word longer than 15 letters keeps the 15-letter size
+  // (the row then scrolls sideways) instead of shrinking; `n` stays the real length for the column count.
+  const nFit = window.TileFit ? window.TileFit.fitLength(n) : n;
   let gap = 4;
-  let side = (usable - SIDE_GAP - (2 * n - 2) * gap) / (2 * n);
+  let side = (usable - SIDE_GAP - (2 * nFit - 2) * gap) / (2 * nFit);
   if (side >= 44) {
     gap = 6;
-    side = (usable - SIDE_GAP - (2 * n - 2) * gap) / (2 * n);
+    side = (usable - SIDE_GAP - (2 * nFit - 2) * gap) / (2 * nFit);
   }
   const cell = px(Math.max(MIN_CELL, Math.min(CELL_CAP, side)));
   return { cell, cols: n, gap };
