@@ -178,16 +178,18 @@
     draw();
   }
 
-  var settingsTab = "find";
+  var settingsTab = "mode"; // update 38: Mode is the first tab (Offline / Test / Live + connection), Cards = Customize Game Cards
   function openSettings(tab) {
     if (tab) settingsTab = tab;
     var m = el("div", "hv-modal"), tb = el("div", "hv-st"), body = el("div", "hv-sbody");
     m.appendChild(mHead("⚙️ Home settings"));
-    var tabs = [["find", "🔎 Find"], ["layout", "🎛 Layout"], ["groups", "🗂️ Groups"]];
+    var tabs = [["mode", "📡 Mode"], ["cards", "🎴 Cards"], ["find", "🔎 Find"], ["layout", "🎛 Layout"], ["groups", "🗂️ Groups"]];
     function show() {
       body.innerHTML = ""; statusEl = null;
       Array.prototype.forEach.call(tb.children, function (b, i) { b.classList.toggle("on", tabs[i][0] === settingsTab); });
-      if (settingsTab === "find") findPanel(body); else if (settingsTab === "layout") layoutPanel(body); else groupsPanel(body);
+      if (settingsTab === "mode") { if (window.PlatformHome) window.PlatformHome.renderModePanel(body); else body.appendChild(el("p", "hv-help", "Loading...")); }
+      else if (settingsTab === "cards") { if (window.PlatformHome) window.PlatformHome.renderCardsPanel(body); else body.appendChild(el("p", "hv-help", "Loading...")); }
+      else if (settingsTab === "find") findPanel(body); else if (settingsTab === "layout") layoutPanel(body); else groupsPanel(body);
     }
     tabs.forEach(function (t) { var b = el("button", "hv-stb", t[1]); b.type = "button"; b.onclick = function () { settingsTab = t[0]; show(); }; tb.appendChild(b); });
     var done = el("button", "hv-done", "Show games"); done.type = "button"; done.onclick = closeOv;
@@ -195,8 +197,9 @@
     showOv(m); show();
     if (settingsTab === "find") setTimeout(function () { try { search.focus(); } catch (e) {} }, 60);
   }
-  var gear = el("button", "cu-open hv-gear", "⚙️"); gear.type = "button"; gear.title = "Home settings: layout, groups, search"; gear.setAttribute("aria-label", "Home settings");
+  var gear = el("button", "cu-open hv-gear", "⚙️"); gear.type = "button"; gear.title = "Home settings: mode, cards, layout, groups, search"; gear.setAttribute("aria-label", "Home settings");
   gear.onclick = function () { openSettings(); };
+  window.HomeSettings = { open: openSettings, close: closeOv }; // used by platform-home.js (mode panel, status pill)
   var cuBtn = document.getElementById("cuOpen");
   if (cuBtn && cuBtn.parentNode) cuBtn.parentNode.insertBefore(gear, cuBtn.nextSibling);
   else { gear.classList.add("hv-float"); document.body.appendChild(gear); }

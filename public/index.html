@@ -10,6 +10,7 @@
 <script src="/shared/theme.js"></script>
 <link rel="stylesheet" href="/home.css" />
 <link rel="stylesheet" href="/home-views.css" />
+<link rel="stylesheet" href="/platform-home.css" />
 <style>
   :root{
     /* Base surface tokens now come from the shared theme system
@@ -169,7 +170,9 @@
         <span class="hb-label" id="hbLabel">TIKTOK LIVE GAMES</span>
       </div>
       <div class="top-tools">
-        <button type="button" class="cu-open" id="cuOpen" aria-label="Customize game cards" title="Customize game cards">🎛️</button>
+        <!-- (update 38) "Customize game cards" moved into ⚙️ Home settings → Cards. This button stays in the page only because
+             home.js opens its panel through it; /platform-home.js hides it and the Cards tab clicks it. -->
+        <button type="button" class="cu-open" id="cuOpen" aria-label="Customize game cards" title="Customize game cards" style="display:none">🎛️</button>
         <label class="theme-picker">
           🎨
           <select data-theme-select aria-label="Platform theme color">
@@ -346,5 +349,7 @@
   <script src="/socket.io/socket.io.js"></script>
   <script src="/home.js"></script>
   <script src="/home-views.js"></script>
+  <script src="/shared/session.js"></script>
+  <script src="/platform-home.js"></script>
 </body>
 </html>

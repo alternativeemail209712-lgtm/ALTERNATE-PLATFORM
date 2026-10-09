@@ -1,0 +1,91 @@
+/* UPDATE 38 - HOME: platform mode, status pill, floating connection window. Uses the page's theme variables. */
+.pf-pill{
+  appearance:none; cursor:pointer; display:inline-flex; align-items:center; gap:6px; max-width:46vw; min-height:40px;
+  padding:6px 12px; border-radius:999px; border:2px dashed var(--thread); background:var(--linen); color:var(--wood-deep);
+  font:700 12px var(--font-body); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow:0 3px 0 rgba(139,90,52,.12);
+}
+.pf-pill:hover{ border-style:solid; }
+.pf-pill:focus-visible{ outline:3px solid rgba(79,160,196,.6); outline-offset:2px; }
+.pf-pill .pf-lamp{ flex:0 0 auto; width:10px; height:10px; border-radius:50%; background:#9a9a9a; box-shadow:0 0 0 2px rgba(255,255,255,.7); }
+.pf-pill.is-good .pf-lamp{ background:#2fa356; animation:pfPulse 2s infinite; }
+.pf-pill.is-warn .pf-lamp,.pf-pill.is-run .pf-lamp{ background:#e0a934; animation:pfPulse 1s infinite; }
+.pf-pill.is-bad .pf-lamp{ background:#d0432f; }
+.pf-pill.is-test .pf-lamp{ background:#e0a934; }
+@keyframes pfPulse{ 50%{ transform:scale(1.35); } }
+.pf-pill .pf-t{ overflow:hidden; text-overflow:ellipsis; }
+
+/* ---------- mode panel (inside Home settings) ---------- */
+.pf-modes{ display:grid; gap:8px; margin:0 0 12px; }
+.pf-mode{
+  appearance:none; cursor:pointer; text-align:left; display:flex; gap:12px; align-items:center; width:100%;
+  padding:12px 14px; min-height:60px; border-radius:16px; border:2px dashed var(--thread); background:var(--linen); color:var(--ink);
+  font-family:var(--font-body);
+}
+.pf-mode .pf-mi{ font-size:24px; flex:0 0 auto; }
+.pf-mode b{ display:block; font:700 15px var(--font-body); color:var(--wood-deep); }
+.pf-mode small{ display:block; font-size:12px; color:var(--ink-mid); font-weight:500; line-height:1.4; margin-top:2px; }
+.pf-mode.on{ border-style:solid; border-color:var(--wood-deep); box-shadow:inset 0 0 0 2px var(--wood-deep); background:#fff8; }
+.pf-mode.on b::after{ content:"  ✓ selected"; font-size:11px; color:var(--green-deep); }
+.pf-sum{ border-radius:14px; padding:10px 12px; font-size:13px; line-height:1.5; font-weight:600; border:2px solid var(--thread); background:var(--linen); margin:0 0 10px; }
+.pf-sum.is-good{ border-color:#2fa356; } .pf-sum.is-warn,.pf-sum.is-run{ border-color:#e0a934; } .pf-sum.is-bad{ border-color:#d0432f; }
+.pf-bigbtn{ appearance:none; cursor:pointer; width:100%; min-height:46px; border-radius:14px; border:2px solid var(--wood-deep); background:var(--wood-deep); color:#fff; font:700 14px var(--font-body); margin-top:6px; }
+.pf-bigbtn.ghost{ background:var(--linen); color:var(--wood-deep); }
+
+/* ---------- floating connection window ---------- */
+.pf-win{
+  position:fixed; z-index:1100; top:72px; right:16px; width:min(392px, calc(100vw - 16px)); max-height:calc(100vh - 88px); max-height:calc(100dvh - 88px);
+  display:flex; flex-direction:column; background:var(--linen); color:var(--ink); border:3px solid var(--wood-deep); border-radius:20px;
+  box-shadow:0 18px 40px rgba(40,25,10,.38), 0 3px 0 rgba(0,0,0,.12); font-family:var(--font-body); overflow:hidden;
+}
+.pf-win[hidden]{ display:none; }
+.pf-head{ display:flex; align-items:center; gap:8px; padding:10px 10px 10px 14px; background:var(--wood-deep); color:#fff; cursor:grab; user-select:none; touch-action:none; }
+.pf-head.drag{ cursor:grabbing; }
+.pf-head b{ font:700 14px var(--font-body); letter-spacing:.02em; }
+.pf-head .pf-sp{ flex:1; }
+.pf-hd{ width:12px; height:12px; border-radius:50%; background:#aaa; box-shadow:0 0 0 2px rgba(255,255,255,.55); flex:0 0 auto; }
+.pf-hd.is-good{ background:#3fd078; } .pf-hd.is-warn,.pf-hd.is-run{ background:#ffc43a; } .pf-hd.is-bad{ background:#ff5a45; }
+.pf-hb{ appearance:none; cursor:pointer; width:34px; height:34px; border-radius:10px; border:0; background:rgba(255,255,255,.18); color:#fff; font:700 16px var(--font-body); }
+.pf-body{ overflow-y:auto; padding:14px; display:grid; gap:10px; }
+.pf-win.min .pf-body{ display:none; }
+.pf-banner{ display:flex; gap:12px; align-items:center; padding:12px; border-radius:14px; border:2px solid var(--thread); background:#fff6; }
+.pf-banner .pf-bi{ font-size:28px; flex:0 0 auto; }
+.pf-banner .pf-bh{ font:700 15px/1.25 var(--font-body); }
+.pf-banner .pf-bs{ font-size:12.5px; color:var(--ink-mid); margin-top:2px; line-height:1.4; font-weight:600; }
+.pf-banner.is-good{ border-color:#2fa356; background:rgba(47,163,86,.12); }
+.pf-banner.is-warn,.pf-banner.is-run{ border-color:#e0a934; background:rgba(224,169,52,.15); }
+.pf-banner.is-bad{ border-color:#d0432f; background:rgba(208,67,47,.12); }
+.pf-lab{ font:700 12px var(--font-body); color:var(--ink-mid); }
+.pf-row{ display:flex; gap:8px; align-items:stretch; }
+.pf-at{ display:flex; align-items:center; font:700 16px var(--font-body); color:var(--ink-mid); }
+.pf-in{ flex:1; min-width:0; min-height:44px; padding:8px 12px; border-radius:12px; border:2px solid var(--thread); background:#fff; color:var(--ink); font:600 16px var(--font-body); }
+.pf-in:focus{ outline:3px solid rgba(79,160,196,.5); border-color:var(--blue); }
+.pf-btn{ appearance:none; cursor:pointer; min-height:44px; padding:0 14px; border-radius:12px; border:2px solid var(--wood-deep); background:var(--linen); color:var(--wood-deep); font:700 14px var(--font-body); }
+.pf-btn.pri{ background:var(--wood-deep); color:#fff; }
+.pf-btn:disabled{ opacity:.5; cursor:not-allowed; }
+.pf-btns{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.pf-btns .pf-btn{ padding:0 6px; font-size:13px; }
+.pf-sec{ font:700 12px var(--font-body); color:var(--ink-mid); text-transform:uppercase; letter-spacing:.06em; margin-top:2px; }
+.pf-checks{ list-style:none; margin:0; padding:0; display:grid; gap:6px; }
+.pf-checks li{ display:flex; gap:9px; align-items:flex-start; font-size:13px; line-height:1.35; }
+.pf-checks .pf-ci{ flex:0 0 22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font:700 12px var(--font-body); color:#fff; background:#9a9a9a; margin-top:1px; }
+.pf-checks .ok .pf-ci{ background:#2fa356; } .pf-checks .fail .pf-ci{ background:#d0432f; } .pf-checks .warn .pf-ci{ background:#e0a934; }
+.pf-checks .run .pf-ci{ background:#4FA0C4; animation:pfPulse 1s infinite; }
+.pf-checks b{ display:block; font-weight:700; }
+.pf-checks span{ color:var(--ink-mid); font-weight:500; word-break:break-word; }
+.pf-reason{ border-radius:14px; padding:10px 12px; border:2px solid #d0432f; background:rgba(208,67,47,.1); font-size:13px; line-height:1.45; }
+.pf-reason.warn{ border-color:#e0a934; background:rgba(224,169,52,.14); }
+.pf-reason b{ display:block; font:700 14px/1.3 var(--font-body); margin-bottom:3px; }
+.pf-reason p{ margin:3px 0 0; }
+.pf-reason .pf-fix{ font-weight:700; }
+.pf-reason code{ display:block; margin-top:6px; padding:6px 8px; border-radius:8px; background:rgba(0,0,0,.06); font:12px/1.4 ui-monospace,Menlo,Consolas,monospace; word-break:break-word; }
+.pf-grid{ display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.pf-grid div{ background:#fff6; border:1.5px solid var(--thread); border-radius:10px; padding:6px 9px; font-size:12px; }
+.pf-grid small{ display:block; color:var(--ink-mid); font-weight:600; font-size:11px; }
+.pf-grid b{ font:700 13px var(--font-body); word-break:break-word; }
+.pf-small{ font-size:12px; color:var(--ink-mid); line-height:1.45; }
+.pf-diag{ border-radius:12px; padding:9px 11px; border:2px dashed var(--thread); font-size:12.5px; line-height:1.45; }
+.pf-diag ul{ margin:4px 0 0 16px; padding:0; }
+@media (max-width:560px){
+  .pf-win{ top:auto; bottom:8px; left:8px !important; right:8px !important; width:auto; max-height:84vh; max-height:84dvh; }
+  .pf-head{ cursor:default; }
+}

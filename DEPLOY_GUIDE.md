@@ -193,3 +193,13 @@ usually a quick library update away from being fixed.
 - Title font picker (15 fonts) in each game's Settings / Host Controls: `public/shared/title-font.js`.
 - Stronger green / yellow / red on tiles, number columns and keyboards: `public/shared/game-colors.css` (edit the `--strong-*` variables at the top to retune all games).
 - Deploy exactly as before: upload this whole folder; start command `npm start`.
+
+
+---
+
+## Using the HOME connection (update 38)
+
+1. Open your site's HOME page, tap ⚙️ → **Mode** → **Live**. A window opens by itself.
+2. Type your TikTok username (start your LIVE first) and press **Connect**. Green = good. Anything else tells you exactly why and what to do.
+3. Open any game: it links to that one connection automatically. No connecting inside games.
+4. Deploy as before (upload the folder to GitHub, Render redeploys). Nothing new to set up.

@@ -63,6 +63,7 @@ import { HostPresence } from "./server/shared/host-presence.js";
 import { mountHomeCards } from "./server/shared/home-cards-store.js";
 import { mountHomeGroups } from "./server/shared/home-groups-store.js";
 import { installTikTokResilience, mountTikTokHealth } from "./server/shared/tiktok-resilience.js";
+import { PlatformHub } from "./server/shared/platform-hub.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -95,6 +96,11 @@ mountHomeCards(app, io, express);
 mountHomeGroups(app, io, express);
 installTikTokResilience();
 mountTikTokHealth(app);
+
+// HOME page (update 38): the platform-wide mode (Offline / Test / Live) and the ONE shared TikTok connection every game
+// links to, plus the detailed connection status for the HOME floating window. See server/shared/platform-hub.js.
+// Registered before the games so every game's connect() can already be handed the shared connection.
+PlatformHub.init(app, express);
 
 // Serves /public/index.html at "/", and transparently serves
 // /public/flagle/*, /public/travle/*, /public/crossdle/*, and
