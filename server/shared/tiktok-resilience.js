@@ -87,6 +87,12 @@ export async function probeLive(user) {
 }
 export async function pageRoomId(user) { return (await probeLive(user)).roomId; }
 
+// (update 38) The platform hub (platform-shared connection) registers itself here. When the HOME page holds ONE
+// live connection for a username, a game's connect() for that same username gets a lightweight "follower" of it
+// instead of opening a second connection. Returns the follower's state, or null = "open your own connection".
+let followerProvider = null;
+export function setFollowerProvider(fn) { followerProvider = typeof fn === "function" ? fn : null; }
+
 const origConnect = TikTokLiveConnection.prototype.connect;
 const origDisconnect = TikTokLiveConnection.prototype.disconnect;
 
@@ -180,11 +186,16 @@ export function installTikTokResilience() {
   TikTokLiveConnection.prototype.connect = async function patchedConnect(roomId, ...rest) {
     const s = stateOf(this);
     s.manual = false; s.ended = false;
+    if (followerProvider && !this.__pfMaster && !roomId) {
+      const shared = await followerProvider(this); // may throw: the shared connection failed / timed out
+      if (shared) return shared;
+    }
     const state = await resilientConnect(this, roomId);
     supervise(this);
     return state;
   };
   TikTokLiveConnection.prototype.disconnect = function patchedDisconnect(...args) {
+    if (typeof this.__pfDetach === "function") { const detach = this.__pfDetach; this.__pfDetach = null; return detach(); } // shared follower: just let go, never close the HOME connection
     const s = stateOf(this);
     if (!s.internal) s.manual = true;
     return origDisconnect.apply(this, args);
