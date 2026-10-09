@@ -729,6 +729,9 @@ function widthConstrainedTileSize(usableWidth, wordLength, hGap) {
 }
 
 function computeTileMetrics(wordLength, rowCount) {
+  // update 39: tile size is sized for the word only (never for how many guesses there are - extra rows scroll),
+  // and with "Auto-resize tiles" switched off a word longer than 15 letters keeps the 15-letter size and scrolls sideways.
+  wordLength = window.TileFit ? window.TileFit.fitLength(wordLength) : wordLength;
   const containerWidth = el.tilesWrap.clientWidth || 320;
   const hGap = 2;
   const avatarGap = 8;
@@ -746,7 +749,7 @@ function computeTileMetrics(wordLength, rowCount) {
 
   const availableHeight = computeAvailableTilesHeight();
   const vGap = 8;
-  const rows = Math.max(1, rowCount);
+  const rows = 1; // update 39: was Math.max(1, rowCount) - more guesses used to shrink every tile
   const rowHeightBudget = Math.floor((availableHeight - vGap * (rows - 1)) / rows);
   let tileSizeByHeight = Math.floor(rowHeightBudget / 1.18);
   tileSizeByHeight = Math.max(8, Math.min(90, tileSizeByHeight));
