@@ -40,7 +40,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { TikTokLiveConnection, WebcastEvent, ControlEvent, SignConfig } from "tiktok-live-connector";
 import { explainTikTokError } from "../shared/tiktok-errors.js";
-import { ANSWER_WORDS, MIN_WORD_LENGTH, MAX_WORD_LENGTH } from "../blindle/blindle-answers.js";
+import { ANSWER_WORDS as EN_ANSWER_WORDS, MIN_WORD_LENGTH } from "../blindle/blindle-answers.js";
 import { Engagement } from "../engagement/engagement-hub.js";
 import { resolveHostAvatar, adoptHostAvatar, isHostUser, collectUserObjects } from "../shared/host-avatar.js";
 import { getStrictFit, setStrictFit } from "../shared/strict-fit-store.js";
@@ -54,9 +54,11 @@ import {
   registerViewer, retryMissingPictures, listViewers, viewerCounts, usableViewers, viewerInfo, readViewerPicture,
   setViewersSelected, setAllViewersSelected, forgetViewer, forgetAllViewers, allowRemovedViewers, onRosterChange
 } from "../shared/viewer-roster-store.js";
-import { dictionaryState, loadDictionary, isValidGuessWord } from "../blindle/blindle-dictionary.js";
-import { buildDifficultyIndex, getWordsForDifficulty } from "../blindle/blindle-difficulty.js";
+import { dictionaryState, loadDictionary } from "../blindle/blindle-dictionary.js";
+import { buildDifficultyIndex } from "../blindle/blindle-difficulty.js";
+import * as WL from "../shared/word-language.js"; // update 48: word language
 
+import { PlatformHub } from "../shared/platform-hub.js";
 function safely(label, fn) {
   return (...args) => {
     try {
@@ -134,7 +136,9 @@ const knownAvatars = new Map();
 function avatarFor(name) {
   const info = viewerInfo(String(name || ""));
   if (info) return viewerBasePath + "/viewer-avatar/" + encodeURIComponent(info.u) + "?v=" + info.v;
-  return avatarFor(name);
+  // update 44: fall back to the last link TikTok sent (was calling itself forever -> stack overflow
+  // for any viewer without a saved picture, which broke every broadcast and chat guess)
+  return knownAvatars.get(String(name || "")) || null;
 }
 
 // The profile picture of the HOST of the current TikTok LIVE session (the
@@ -282,7 +286,29 @@ function buildLetterStates(guesses) {
   return best;
 }
 
-const difficultyIndex = buildDifficultyIndex(ANSWER_WORDS);
+// ---- WORD LANGUAGE (update 48) -------------------------------------------------------------
+// The host picks the word language in Settings (English / Indonesian / Bahasa Melayu / 4 mixes).
+// ANSWER_WORDS, MAX_WORD_LENGTH and the difficulty index follow that choice.
+const WORD_GAME_ID = "shapedle";
+let wordLanguage = WL.getLanguage(WORD_GAME_ID);
+let ANSWER_WORDS = WL.getBank(wordLanguage, EN_ANSWER_WORDS).answers;
+let MAX_WORD_LENGTH = WL.getBank(wordLanguage, EN_ANSWER_WORDS).maxLength;
+let difficultyIndex = buildDifficultyIndex(ANSWER_WORDS);
+const getWordsForDifficulty = WL.getWordsForDifficulty;
+function isValidGuessWord(word) {
+  return WL.isValidGuess(wordLanguage, word);
+}
+function applyWordLanguage(mode) {
+  const bank = WL.getBank(mode, EN_ANSWER_WORDS);
+  wordLanguage = bank.mode;
+  ANSWER_WORDS = bank.answers;
+  MAX_WORD_LENGTH = bank.maxLength;
+  difficultyIndex = buildDifficultyIndex(ANSWER_WORDS);
+  game.usedWords.clear();
+  game.wordLength = clampWordLength(game.wordLength);
+  if (game.lengthMin !== undefined) game.lengthMin = clampWordLength(game.lengthMin);
+  if (game.lengthMax !== undefined) game.lengthMax = clampWordLength(game.lengthMax);
+}
 
 const DEFAULT_AUTO_CONTINUE_DELAY = 3;
 const DEFAULT_LEADERBOARD_SHOW_SECONDS = 3;
@@ -866,6 +892,9 @@ function buildStatePayload() {
       hintSuggestions: game.hintSuggestions,
       lastRejection: game.lastRejection,
       strictFit: game.strictFit,
+      wordLanguage,
+      wordLanguages: WL.languageOptionsForClient(),
+      wordLanguageInfo: WL.describeLanguage(wordLanguage),
       keyAutoColor: game.keyAutoColor,
       starterWord: game.starterWord,
       lastWinInfo: game.lastWinInfo,
@@ -1034,6 +1063,16 @@ function handleClientAction(ws, msg) {
       game.starterWord = setStarterWord("shapedle", Boolean(payload && payload.on));
       broadcastState();
       break;
+    case "set_word_language": {
+      const prevLanguage = wordLanguage;
+      const nextLanguage = WL.setLanguage(WORD_GAME_ID, payload && payload.mode);
+      if (nextLanguage !== prevLanguage) {
+        applyWordLanguage(nextLanguage);
+        if (game.status === "live") playAgain(); // the running round's word is in the old language
+      }
+      broadcastState();
+      break;
+    }
     case "set_strict_fit":
       game.strictFit = setStrictFit("shapedle", Boolean(payload && payload.on));
       broadcastState();
@@ -1153,3 +1192,19 @@ if (isRunDirectly) {
     console.log(`[SHAPEDLE] Standalone test server listening on port ${PORT}`);
   });
 }
+
+// Update 42: the HOME page's shared TikTok connection links this game by itself - no need to open the game and press
+// Connect. Uses the same actions the game's own buttons send (switch to Live, then connect), only when not linked yet.
+PlatformHub.registerGame(
+  "shapedle",
+  (username) => {
+    const ws = { emit() {}, send() {} };
+    if (game.mode !== "live") handleClientAction(ws, { type: "apply_settings", payload: { mode: "live" } });
+    handleClientAction(ws, { type: "connect_tiktok", payload: { username } });
+  },
+  (username) => {
+    const u = String(username || "").replace(/^@/, "").toLowerCase();
+    const cur = String(diagnostics.tiktokUsername || "").replace(/^@/, "").toLowerCase();
+    return game.mode === "live" && ["live", "connecting", "retrying"].includes(diagnostics.connectionStatus) && (!cur || cur === u);
+  }
+);

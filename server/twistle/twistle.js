@@ -29,9 +29,10 @@
 //                     chat, scores NOT saved), Offline (host plays solo).
 // ============================================================================
 
-import { ANSWER_WORDS, MIN_WORD_LENGTH, MAX_WORD_LENGTH } from '../blindle/blindle-answers.js';
-import { dictionaryState, loadDictionary, isValidGuessWord } from '../blindle/blindle-dictionary.js';
-import { buildDifficultyIndex, getWordsForDifficulty } from '../blindle/blindle-difficulty.js';
+import { ANSWER_WORDS as EN_ANSWER_WORDS, MIN_WORD_LENGTH } from '../blindle/blindle-answers.js';
+import { dictionaryState, loadDictionary } from '../blindle/blindle-dictionary.js';
+import { buildDifficultyIndex } from '../blindle/blindle-difficulty.js';
+import * as WL from '../shared/word-language.js'; // update 48: word language
 import { isBlocked } from '../crossdle/crossdle-blocklist.js';
 import { Diagnostics } from './twistle-diagnostics.js';
 import { TikTokManager } from './twistle-tiktok.js';
@@ -65,11 +66,35 @@ export async function registerTwistle(app, rootIo, options = {}) {
   const io = rootIo.of('/twistle');
   const diagnostics = new Diagnostics();
 
-  const difficultyIndex = buildDifficultyIndex(ANSWER_WORDS);
+  // ---- WORD LANGUAGE (update 48) -------------------------------------------------------------
+  // The host picks the word language in Settings; the word bank, longest word length and the
+  // difficulty index all follow it.
+  const WORD_GAME_ID = 'twistle';
+  let wordLanguage = WL.getLanguage(WORD_GAME_ID);
+  let ANSWER_WORDS = WL.getBank(wordLanguage, EN_ANSWER_WORDS).answers;
+  let MAX_WORD_LENGTH = WL.getBank(wordLanguage, EN_ANSWER_WORDS).maxLength;
+  let difficultyIndex = buildDifficultyIndex(ANSWER_WORDS);
+  const getWordsForDifficulty = WL.getWordsForDifficulty;
+  function isValidGuessWord(word) {
+    return WL.isValidGuess(wordLanguage, word);
+  }
   // Every curated word is always an acceptable guess, even if the big
   // dictionary hasn't loaded (offline fallback mode).
-  const answerSet = new Set(Object.values(ANSWER_WORDS).flat());
-  const wordBankSize = answerSet.size;
+  let answerSet = new Set(Object.values(ANSWER_WORDS).flat());
+  let wordBankSize = answerSet.size;
+  function applyWordLanguage(mode) {
+    const bank = WL.getBank(mode, EN_ANSWER_WORDS);
+    wordLanguage = bank.mode;
+    ANSWER_WORDS = bank.answers;
+    MAX_WORD_LENGTH = bank.maxLength;
+    difficultyIndex = buildDifficultyIndex(ANSWER_WORDS);
+    answerSet = new Set(Object.values(ANSWER_WORDS).flat());
+    wordBankSize = answerSet.size;
+    game.usedWords.clear();
+    game.wordLength = clampWordLength(game.wordLength);
+    game.lengthMin = clampWordLength(game.lengthMin);
+    game.lengthMax = clampWordLength(game.lengthMax);
+  }
 
   // A viewer's most-recently-seen profile picture, so the real TikTok avatar
   // can be shown next to every guess, win and leaderboard row that mentions
@@ -520,6 +545,9 @@ export async function registerTwistle(app, rootIo, options = {}) {
         lastWinInfo: game.lastWinInfo,
         lastRejection: game.lastRejection,
         strictFit: game.strictFit,
+        wordLanguage,
+        wordLanguages: WL.languageOptionsForClient(),
+        wordLanguageInfo: WL.describeLanguage(wordLanguage),
         starterWord: game.starterWord,
         rejectionToastSeconds: game.rejectionToastSeconds,
         autoContinue: game.autoContinue,
@@ -646,6 +674,15 @@ export async function registerTwistle(app, rootIo, options = {}) {
     }));
     socket.on('host:setStarterWord', guarded('setStarterWord', (payload) => {
       game.starterWord = setStarterWord('twistle', Boolean(payload && payload.on));
+      broadcastState();
+    }));
+    socket.on('host:setWordLanguage', guarded('setWordLanguage', (payload) => {
+      const prev = wordLanguage;
+      const next = WL.setLanguage(WORD_GAME_ID, payload && payload.mode);
+      if (next !== prev) {
+        applyWordLanguage(next);
+        if (game.status === 'live') startRound(); // the running round's word is in the old language
+      }
       broadcastState();
     }));
     socket.on('host:setStrictFit', guarded('setStrictFit', (payload) => {

@@ -14,7 +14,11 @@
 
 const path = require("path");
 const tiktokLib = require("tiktok-live-connector");
-const PUZZLES = require("./findle-puzzles.cjs");
+const PUZZLES_EN = require("./findle-puzzles.cjs");
+const PUZZLES_ID = require("./findle-puzzles-id.cjs"); // update 48: Indonesian puzzles
+const PUZZLES_MS = require("./findle-puzzles-ms.cjs"); // update 48: Bahasa Melayu (Malaysia) puzzles
+const PUZZLES_BY_LANG = { en: PUZZLES_EN, id: PUZZLES_ID, ms: PUZZLES_MS };
+const wordLang = require("./findle-language.cjs"); // update 48: word language (7 modes)
 const { generatePuzzleGrid } = require("./findle-grid-generator.cjs");
 
 // The tiktok-live-connector library has renamed its main class before
@@ -81,6 +85,7 @@ function registerFindle(app, rootIO) {
     settings: {
       autoAdvanceDelaySeconds: 3,
       leaderboardDisplaySeconds: 3,
+      wordLanguage: wordLang.load(), // update 48
     },
   };
 
@@ -152,7 +157,9 @@ function registerFindle(app, rootIO) {
     return {
       connection: state.connection,
       settings: state.settings,
+      wordLanguages: wordLang.options(), // update 48
       game: {
+        puzzleLanguage: g.puzzleLanguage || null, // update 48: language of the current puzzle
         status: g.status,
         difficulty: g.difficulty,
         theme: g.theme,
@@ -199,7 +206,13 @@ function registerFindle(app, rootIO) {
   }
 
   function pickPuzzle(difficulty) {
-    const bank = PUZZLES[difficulty] || PUZZLES.easy;
+    // update 48: the host's word language decides which puzzle list is used. Mixed modes pick one of
+    // the chosen languages at random for every puzzle, so each language gets an equal share.
+    const langParts = wordLang.parts(state.settings.wordLanguage);
+    const lang = langParts[Math.floor(Math.random() * langParts.length)];
+    state.game.puzzleLanguage = lang;
+    const langPuzzles = PUZZLES_BY_LANG[lang] || PUZZLES_EN;
+    const bank = langPuzzles[difficulty] || langPuzzles.easy;
     const unused = bank.filter((p) => !state.game.usedThemes.includes(p.theme));
     const pool = unused.length ? unused : bank;
     if (!unused.length) state.game.usedThemes = [];
@@ -618,6 +631,16 @@ function registerFindle(app, rootIO) {
         state.game.difficulty = d;
         broadcastState();
       }
+    });
+
+    socket.on("host:setWordLanguage", (payload) => {
+      // update 48: English / Indonesian / Bahasa Melayu / 4 mixes. A puzzle in progress restarts in the new language.
+      const next = wordLang.normalize(payload && payload.mode);
+      if (next === state.settings.wordLanguage) return broadcastState();
+      state.settings.wordLanguage = next;
+      wordLang.save(next);
+      if (state.game.status === "playing" || state.game.status === "paused") startRound();
+      else broadcastState();
     });
 
     socket.on("host:startGame", () => startRound());

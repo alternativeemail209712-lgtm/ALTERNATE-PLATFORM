@@ -8,7 +8,30 @@
 // ============================================================================
 
 import { WORD_LENGTH_OPTIONS, MIN_WORD_LENGTH, MAX_WORD_LENGTH, randomWord, isKnownWord } from './crossdle-dictionary.js';
-import { ANSWER_WORDS } from './crossdle-answers.js';
+import { ANSWER_WORDS as EN_ANSWER_WORDS } from './crossdle-answers.js';
+import * as WL from '../shared/word-language.js'; // update 48: word language
+
+// ---- WORD LANGUAGE (update 48) ---------------------------------------------------------------
+// The host picks the word language in Settings. The secret word, the decoy word and the pool the
+// strict-fit check judges against all come from the chosen language bank.
+const WORD_GAME_ID = 'crossdle';
+let wordLanguage = WL.getLanguage(WORD_GAME_ID);
+let ANSWER_WORDS = WL.getBank(wordLanguage, EN_ANSWER_WORDS).answers;
+
+export function getWordLanguage() {
+  return wordLanguage;
+}
+/** Switches the language bank used by every future round (call GameEngine.setWordLanguage from the host layer). */
+function applyWordLanguageBank(mode) {
+  const bank = WL.getBank(mode, EN_ANSWER_WORDS);
+  wordLanguage = bank.mode;
+  ANSWER_WORDS = bank.answers;
+  return bank;
+}
+/** Every secret-word candidate of a length in the current language (for Test Mode's fake chat). */
+export function getAnswerPool(length) {
+  return ANSWER_WORDS[length] || [];
+}
 import { getStrictFit, setStrictFit } from '../shared/strict-fit-store.js';
 import { getKeyAutoColor, setKeyAutoColor } from '../shared/key-autocolor-store.js';
 import { getStarterWord, setStarterWord } from '../shared/starter-word-store.js';
@@ -202,7 +225,9 @@ function pickWord(length, exclude = []) {
   const curatedPool = ANSWER_WORDS[length];
   if (curatedPool && curatedPool.length > 0) {
     const ex = new Set(exclude);
-    const available = curatedPool.filter((w) => !ex.has(w));
+    // mixed language modes: every language gets a fair share (see shared/word-language.js)
+    const weighted = WL.getWordsForDifficulty(ANSWER_WORDS, null, length, 'random');
+    const available = weighted.filter((w) => !ex.has(w));
     const pool = available.length > 0 ? available : curatedPool;
     return pool[Math.floor(Math.random() * pool.length)];
   }
@@ -244,7 +269,14 @@ export function extractGuessWord(text, wordLength) {
  * and added to the board. Random keyboard-mash never becomes a row.
  */
 export function isAcceptableGuess(word, wordLength) {
-  return isKnownWord(word, wordLength);
+  for (const part of WL.modeInfo(wordLanguage).parts) {
+    if (part === 'en') {
+      if (isKnownWord(word, wordLength)) return true;
+    } else if (WL.isValidGuess(part, word)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function scoreForSolve(attemptCountIncludingSolve, hintsUsedCount, quickSolve) {
@@ -300,10 +332,29 @@ export class GameEngine {
     this.onChange('settings');
   }
 
+  /** Longest word length that has words in the current language. */
+  getMaxWordLength() {
+    return WL.getBank(wordLanguage, EN_ANSWER_WORDS).maxLength;
+  }
+
+  /** Host switch (update 48): the word language. Takes effect from the next round (a running round is restarted). */
+  setWordLanguage(mode) {
+    const prev = wordLanguage;
+    const next = WL.setLanguage(WORD_GAME_ID, mode);
+    if (next === prev) {
+      this.onChange('settings');
+      return false;
+    }
+    const bank = applyWordLanguageBank(next);
+    if (this.wordLength > bank.maxLength) this.wordLength = bank.maxLength;
+    this.onChange('settings');
+    return true;
+  }
+
   /** Host-adjustable word length (4-20 letters) used for future rounds. */
   setWordLength(n) {
     const len = Number(n);
-    if (!Number.isInteger(len) || len < MIN_WORD_LENGTH || len > MAX_WORD_LENGTH) return;
+    if (!Number.isInteger(len) || len < MIN_WORD_LENGTH || len > Math.min(MAX_WORD_LENGTH, this.getMaxWordLength())) return;
     if (curatedAnswerPoolSize(len) < 2) return; // guard against an empty/near-empty answer bank
     this.wordLength = len;
     this.onChange('settings');
@@ -538,6 +589,10 @@ export class GameEngine {
       wordLength: this.wordLength,
       nextRoundDelayMs: this.nextRoundDelayMs,
       strictFit: this.strictFit,
+      wordLanguage,
+      wordLanguages: WL.languageOptionsForClient(),
+      wordLanguageInfo: WL.describeLanguage(wordLanguage),
+      maxWordLength: WL.getBank(wordLanguage, EN_ANSWER_WORDS).maxLength,
       keyAutoColor: this.keyAutoColor,
       starterWord: this.starterWord,
       leaderboard: this.getLeaderboardTop(10),

@@ -24,9 +24,11 @@
 // hints, Live / Test / Offline modes, host-set secret word, difficulty tiers, win celebration +
 // leaderboards.
 //
-// Guess rule: any real word of the right length that is not already on the board is accepted
-// and colored (it does NOT have to match the code - guesses are probes). The host can switch
-// BLINDLE's "must fit every earlier clue" rule on in Settings ("Strict fit").
+// Guess rule (update 45): a guess must be a real word of the right length, not already on the board,
+// AND its own letters must follow the CODE - i.e. sorting the guess alphabetically must give the same
+// numbers as the code on screen (same letters-come-before/after-each-other pattern). Words that break
+// the code are never accepted. The same applies to the automatic starter word and to hints. The host
+// can additionally switch BLINDLE's "must fit every earlier clue" rule on in Settings ("Strict fit").
 //
 // Differences from BLINDLE:
 //   - the clue is one of five colors per LETTER, plus the numeric code row on top of the board
@@ -46,15 +48,17 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { TikTokLiveConnection, WebcastEvent, SignConfig } from "tiktok-live-connector";
 import { explainTikTokError } from "../shared/tiktok-errors.js";
-import { ANSWER_WORDS, MIN_WORD_LENGTH, MAX_WORD_LENGTH } from "../blindle/blindle-answers.js";
+import { ANSWER_WORDS as EN_ANSWER_WORDS, MIN_WORD_LENGTH } from "../blindle/blindle-answers.js";
 import { Engagement } from "../engagement/engagement-hub.js";
 import { resolveHostAvatar, adoptHostAvatar, isHostUser } from "../shared/host-avatar.js";
 import { getStrictFit, setStrictFit } from "../shared/strict-fit-store.js";
 import { getStarterWord, setStarterWord } from "../shared/starter-word-store.js";
 import { getKeyAutoColor, setKeyAutoColor } from "../shared/key-autocolor-store.js";
-import { dictionaryState, loadDictionary, isValidGuessWord } from "../blindle/blindle-dictionary.js";
-import { buildDifficultyIndex, getWordsForDifficulty } from "../blindle/blindle-difficulty.js";
+import { dictionaryState, loadDictionary } from "../blindle/blindle-dictionary.js";
+import { buildDifficultyIndex } from "../blindle/blindle-difficulty.js";
+import * as WL from "../shared/word-language.js"; // update 48: word language
 
+import { PlatformHub } from "../shared/platform-hub.js";
 function safely(label, fn) {
   return (...args) => {
     try {
@@ -170,6 +174,13 @@ function scoreClue(guess, answer) {
   return out;
 }
 
+// update 45: true when `word` follows the code shown on the board (same alphabetical-order pattern
+// as the hidden word). The hidden word itself always matches.
+function matchesCode(word, secret) {
+  if (!word || !secret || word.length !== secret.length) return false;
+  return cluesEqual(buildCode(word), buildCode(secret));
+}
+
 function cluesEqual(a, b) {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
@@ -209,7 +220,29 @@ function buildLetterStates(guesses) {
   return best;
 }
 
-const difficultyIndex = buildDifficultyIndex(ANSWER_WORDS);
+// ---- WORD LANGUAGE (update 48) -------------------------------------------------------------
+// The host picks the word language in Settings (English / Indonesian / Bahasa Melayu / 4 mixes).
+// ANSWER_WORDS, MAX_WORD_LENGTH and the difficulty index follow that choice.
+const WORD_GAME_ID = "codedle";
+let wordLanguage = WL.getLanguage(WORD_GAME_ID);
+let ANSWER_WORDS = WL.getBank(wordLanguage, EN_ANSWER_WORDS).answers;
+let MAX_WORD_LENGTH = WL.getBank(wordLanguage, EN_ANSWER_WORDS).maxLength;
+let difficultyIndex = buildDifficultyIndex(ANSWER_WORDS);
+const getWordsForDifficulty = WL.getWordsForDifficulty;
+function isValidGuessWord(word) {
+  return WL.isValidGuess(wordLanguage, word);
+}
+function applyWordLanguage(mode) {
+  const bank = WL.getBank(mode, EN_ANSWER_WORDS);
+  wordLanguage = bank.mode;
+  ANSWER_WORDS = bank.answers;
+  MAX_WORD_LENGTH = bank.maxLength;
+  difficultyIndex = buildDifficultyIndex(ANSWER_WORDS);
+  game.usedWords.clear();
+  game.wordLength = clampWordLength(game.wordLength);
+  if (game.lengthMin !== undefined) game.lengthMin = clampWordLength(game.lengthMin);
+  if (game.lengthMax !== undefined) game.lengthMax = clampWordLength(game.lengthMax);
+}
 
 const DEFAULT_AUTO_CONTINUE_DELAY = 3;
 const DEFAULT_LEADERBOARD_SHOW_SECONDS = 3;
@@ -337,6 +370,17 @@ function attemptGuess(word, caller) {
     return { ok: false, error: "That word is already on the board.", duplicate: true };
   }
 
+  // update 45: the guess must obey the code on the board. Chat guesses that break it are ignored
+  // silently (no toast, so random words can't flood the screen); host / offline guesses get the message.
+  if (!matchesCode(word, game.secretWord)) {
+    if (caller === "Host") {
+      const reason = `"${word.toUpperCase()}" doesn't follow the code ${buildCode(game.secretWord).join(" ")}`;
+      game.lastRejection = { word, reason, at: Date.now() };
+      return { ok: false, error: reason, rejected: true };
+    }
+    return { ok: false, error: "Doesn't follow the code.", rejected: true, silent: true };
+  }
+
   const consistency = game.strictFit ? checkConsistency(word) : { ok: true };
   if (!consistency.ok) {
     const reason = `Doesn't fit the colors of guess #${consistency.conflictIndex + 1} (${consistency.conflictWord.toUpperCase()}: ${formatClue(consistency.conflictClue)})`;
@@ -358,7 +402,7 @@ const STARTER_GUESS_LABEL = "🎲 Starter word";
 
 function pickStarterWord(wordLength) {
   const pool = getWordsForDifficulty(ANSWER_WORDS, difficultyIndex, wordLength, "random")
-    .filter((w) => w !== game.secretWord);
+    .filter((w) => w !== game.secretWord && matchesCode(w, game.secretWord)); // update 45: starter obeys the code too
   if (pool.length === 0) return null;
   return pool[Math.floor(Math.random() * pool.length)];
 }
@@ -477,6 +521,9 @@ function useHint() {
     (w) => w !== game.secretWord && !onBoard.has(w) && !game.hintSuggestions.includes(w)
   );
   if (candidates.length === 0) return;
+  // update 45: hints must follow the code too (when any such word exists)
+  const codeFit = candidates.filter((w) => matchesCode(w, game.secretWord));
+  if (codeFit.length > 0) candidates = codeFit;
 
   const secretCode = buildCode(game.secretWord);
   const scored = candidates.map((w) => {
@@ -713,7 +760,9 @@ function startTestMode() {
         text = game.secretWord;
       } else if (game.status === "live" && roll < 0.4) {
         const pool = getWordsForDifficulty(ANSWER_WORDS, difficultyIndex, game.wordLength, game.difficulty);
-        text = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : FAKE_JUNK_WORDS[0];
+        const fit = pool.filter((w) => matchesCode(w, game.secretWord)); // update 45: test viewers mostly send code-following words
+        const src = fit.length > 0 && Math.random() < 0.8 ? fit : pool;
+        text = src.length > 0 ? src[Math.floor(Math.random() * src.length)] : FAKE_JUNK_WORDS[0];
       } else {
         text = FAKE_JUNK_WORDS[Math.floor(Math.random() * FAKE_JUNK_WORDS.length)];
       }
@@ -761,6 +810,9 @@ function buildStatePayload() {
       hintSuggestions: game.hintSuggestions,
       lastRejection: game.lastRejection,
       strictFit: game.strictFit,
+      wordLanguage,
+      wordLanguages: WL.languageOptionsForClient(),
+      wordLanguageInfo: WL.describeLanguage(wordLanguage),
       keyAutoColor: game.keyAutoColor,
       starterWord: game.starterWord,
       lastWinInfo: game.lastWinInfo,
@@ -875,6 +927,16 @@ function handleClientAction(ws, msg) {
       game.starterWord = setStarterWord("codedle", Boolean(payload && payload.on));
       broadcastState();
       break;
+    case "set_word_language": {
+      const prevLanguage = wordLanguage;
+      const nextLanguage = WL.setLanguage(WORD_GAME_ID, payload && payload.mode);
+      if (nextLanguage !== prevLanguage) {
+        applyWordLanguage(nextLanguage);
+        if (game.status === "live") playAgain(); // the running round's word is in the old language
+      }
+      broadcastState();
+      break;
+    }
     case "set_strict_fit":
       game.strictFit = setStrictFit("codedle", Boolean(payload && payload.on));
       broadcastState();
@@ -971,3 +1033,19 @@ if (isRunDirectly) {
     console.log(`[CODEDLE] Standalone test server listening on port ${PORT}`);
   });
 }
+
+// Update 42: the HOME page's shared TikTok connection links this game by itself - no need to open the game and press
+// Connect. Uses the same actions the game's own buttons send (switch to Live, then connect), only when not linked yet.
+PlatformHub.registerGame(
+  "codedle",
+  (username) => {
+    const ws = { emit() {}, send() {} };
+    if (game.mode !== "live") handleClientAction(ws, { type: "apply_settings", payload: { mode: "live" } });
+    handleClientAction(ws, { type: "connect_tiktok", payload: { username } });
+  },
+  (username) => {
+    const u = String(username || "").replace(/^@/, "").toLowerCase();
+    const cur = String(diagnostics.tiktokUsername || "").replace(/^@/, "").toLowerCase();
+    return game.mode === "live" && ["live", "connecting", "retrying"].includes(diagnostics.connectionStatus) && (!cur || cur === u);
+  }
+);

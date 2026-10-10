@@ -86,12 +86,14 @@ const DEFAULT_SETTINGS = {
   // Guesses are unlimited (see processGuess below) - there is no guess-
   // count setting anymore; only running out of time ends a round early.
   revealPauseMs: 6000,    // pause between a round ending and the next one starting
+  leaderboardShowSeconds: 4, // update 46: how long each win-celebration window (winner / session board / all-time board) stays up
 };
 const SETTINGS_LIMITS = {
   roundSeconds: { min: 10, max: 180 },
   revealHoldSeconds: { min: 0, max: 60 },
   maxBlurPx: { min: 2, max: 40 },
   revealPauseMs: { min: 2000, max: 30000 },
+  leaderboardShowSeconds: { min: 1, max: 30 },
 };
 
 function clamp(value, lo, hi, fallback) {
@@ -117,6 +119,9 @@ function sanitizeSettings(input, base) {
   }
   if (input.revealPauseMs !== undefined) {
     out.revealPauseMs = clamp(input.revealPauseMs, SETTINGS_LIMITS.revealPauseMs.min, SETTINGS_LIMITS.revealPauseMs.max, base.revealPauseMs);
+  }
+  if (input.leaderboardShowSeconds !== undefined) {
+    out.leaderboardShowSeconds = clamp(input.leaderboardShowSeconds, SETTINGS_LIMITS.leaderboardShowSeconds.min, SETTINGS_LIMITS.leaderboardShowSeconds.max, base.leaderboardShowSeconds);
   }
   if (input.revealHoldSeconds !== undefined) {
     // Always leave at least 3 real seconds for the blur-to-sharp
@@ -223,6 +228,7 @@ function endRound(session, winner) {
     winner: winner ? winner.username : null,
     winnerAvatar: winner ? winner.avatarUrl || null : null,
     points: winner ? winner.points : 0,
+    mode: session.mode, // update 46: client only records all-time points for LIVE rounds
     leaderboard: leaderboard(session),
   });
 
@@ -240,7 +246,8 @@ function processGuess(session, username, rawText) {
 
   if (guessedCountry.code === target.code) {
     const points = 1;
-    session.scores.set(username, (session.scores.get(username) || 0) + points);
+    // update 46: like the word games, only LIVE rounds are scored (Test / Offline never touch the leaderboard)
+    if (session.mode === "live") session.scores.set(username, (session.scores.get(username) || 0) + points);
     endRound(session, { username, points, avatarUrl: session.avatars.get(username) || null });
     return true;
   }

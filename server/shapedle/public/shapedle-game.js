@@ -901,6 +901,8 @@ let lastTilesSignature = "";
 
 function render(state) {
   lastState = state;
+  if (window.ScoreTicker) window.ScoreTicker.update(state); // update 47: scrolling top-scorers ticker
+  if (window.WordLanguage) window.WordLanguage.update(state.game, (mode) => send("set_word_language", { mode })); // update 48: word language
   detectWinTransition(state.game);
   renderHeader(state);
   renderModeUI(state.game);

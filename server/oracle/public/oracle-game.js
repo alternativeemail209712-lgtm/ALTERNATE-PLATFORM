@@ -676,6 +676,8 @@ let revealedColors = null;
 
 function render(state) {
   lastState = state;
+  if (window.ScoreTicker) window.ScoreTicker.update(state); // update 47: scrolling top-scorers ticker
+  if (window.WordLanguage) window.WordLanguage.update(state.game, (mode) => send("set_word_language", { mode })); // update 48: word language
   const newColors = state.game.columnColors || null;
   if (JSON.stringify(newColors) !== JSON.stringify(revealedColors)) lastTilesSignature = "";
   revealedColors = newColors;

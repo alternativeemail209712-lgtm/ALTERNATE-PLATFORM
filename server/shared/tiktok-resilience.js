@@ -20,9 +20,12 @@ const SCALE = Number(process.env.TIKTOK_DELAY_SCALE) || 1; // tests only
 const LOOKUP_RETRY_MS = [3000, 8000, 15000];
 const RECONNECT_MS = [3000, 6000, 12000, 20000, 30000, 45000, 60000, 60000, 90000, 120000];
 const MIN_GAP_MS = 1500;
-const CACHE_MS = 6 * 60 * 60 * 1000;
+// A saved room id is only trusted for a short blip (a dropped socket that reconnects within 2 minutes). A longer-lived
+// id is how a connection could "succeed" against the room of an OLD live and then receive no chat at all (update 42).
+const CACHE_MS = 2 * 60 * 1000;
 
 const roomCache = new Map();
+export function forgetRoom(user) { roomCache.delete(normalizeUser(user)); }
 const stats = { lookups: 0, cacheHits: 0, pageHits: 0, pageMisses: 0, retries: 0, reconnects: 0, lastError: null, lastErrorAt: 0, lastOkAt: 0 };
 const states = new WeakMap();
 
@@ -108,7 +111,7 @@ async function resilientConnect(conn, roomIdArg) {
   if (roomIdArg) return record(await origConnect.call(conn, roomIdArg));
 
   let lastErr, lastProbe = null;
-  const cached = roomCache.get(user);
+  const cached = conn.__pfFresh ? null : roomCache.get(user); // update 42: a fresh connect never trusts a remembered room
   if (cached && Date.now() - cached.at < CACHE_MS) {
     try { stats.cacheHits++; return record(await origConnect.call(conn, cached.roomId)); }
     catch (e) {
@@ -166,11 +169,12 @@ async function reconnectLoop(conn) {
   } finally { s.reconnecting = false; s.internal = false; }
 }
 
+const user0 = (conn) => normalizeUser(conn && (conn.uniqueId || conn._uniqueId));
 function supervise(conn) {
   const s = stateOf(conn);
   if (s.supervised) return;
   s.supervised = true;
-  conn.on((WebcastEvent && WebcastEvent.STREAM_END) || "streamEnd", () => { s.ended = true; });
+  conn.on((WebcastEvent && WebcastEvent.STREAM_END) || "streamEnd", () => { s.ended = true; roomCache.delete(user0(conn)); });
   conn.on((ControlEvent && ControlEvent.DISCONNECTED) || "disconnected", () => {
     if (s.manual || s.ended || s.reconnecting) return;
     if (typeof conn.listenerCount === "function" && conn.listenerCount("reconnected") === 0) return; // game handles it itself
@@ -198,6 +202,7 @@ export function installTikTokResilience() {
     if (typeof this.__pfDetach === "function") { const detach = this.__pfDetach; this.__pfDetach = null; return detach(); } // shared follower: just let go, never close the HOME connection
     const s = stateOf(this);
     if (!s.internal) s.manual = true;
+    if (!this.__pfMaster) { try { roomCache.delete(normalizeUser(this.uniqueId)); } catch (_) { /* ignore */ } }
     return origDisconnect.apply(this, args);
   };
   console.log("[tiktok] connection resilience active (room-id memory, patient retries, auto-reconnect)");

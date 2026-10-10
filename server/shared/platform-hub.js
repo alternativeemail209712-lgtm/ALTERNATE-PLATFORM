@@ -26,7 +26,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { TikTokLiveConnection, WebcastEvent, ControlEvent } from "tiktok-live-connector";
-import { normalizeUser, setFollowerProvider, tiktokStats } from "./tiktok-resilience.js";
+import { normalizeUser, setFollowerProvider, tiktokStats, forgetRoom, probeLive } from "./tiktok-resilience.js";
 import { explainTikTokErrorParts } from "./tiktok-errors.js";
 import { HostPresence } from "./host-presence.js";
 
@@ -97,6 +97,10 @@ class PlatformHubClass {
     this._hb = null;
     this.lastDataAt = 0;
     this._attemptMaster = null;
+    this.games = new Map(); // update 42: games that the hub links to the shared connection by itself
+    this.lastChat = null;
+    this._wd = null;
+    this.watchdogNote = "";
   }
 
   // ------------------------------------------------------------------ setup
@@ -189,6 +193,8 @@ class PlatformHubClass {
     // Claim the username + "connecting" state synchronously, so a game that connects in the same instant waits
     // for (and shares) this connection instead of opening its own.
     const gen = ++this.gen;
+    forgetRoom(user); // update 42: never reuse a remembered room id for a fresh Connect (could be an OLD live)
+    clearTimeout(this._wd);
     this.mode = "live";
     this.username = user;
     this.attempt = 0;
@@ -197,6 +203,8 @@ class PlatformHubClass {
     this.chatCount = 0;
     this.viewers = null;
     this.lastEventAt = 0;
+    this.lastChat = null;
+    this.watchdogNote = "";
     this.eventTimes = [];
     this._set("connecting");
     await this._teardown(false);
@@ -251,11 +259,14 @@ class PlatformHubClass {
 
   // ------------------------------------------------------------------ master connection
   _makeMaster(user) {
-    const opts = { processInitialData: true, fetchRoomInfoOnConnect: true };
+    // update 43: processInitialData OFF - after every (re)connect TikTok replays the last few minutes of messages, which would
+    // otherwise be counted again as new likes / gifts / shares and be read again as new guesses.
+    const opts = { processInitialData: false, fetchRoomInfoOnConnect: true };
     const key = process.env.EULERSTREAM_API_KEY || process.env.TIKTOK_SIGN_API_KEY;
     if (key) opts.signApiKey = key;
     const master = new TikTokLiveConnection(user, opts);
     master.__pfMaster = true;
+    master.__pfFresh = true; // first connect always looks the live room up from scratch
     const origEmit = master.emit.bind(master);
     master.emit = (ev, ...args) => {
       if (this.master === master || this._attemptMaster === master || ev === EV_DISCONNECTED) this._observe(ev, args, master);
@@ -279,10 +290,102 @@ class PlatformHubClass {
     try { HostPresence.register(master, { game: "platform", tiktokUsername: user }); } catch (_) { /* banner only */ }
     master.on(EV_DISCONNECTED, () => this._onDropped(master));
     master.on(EV_STREAM_END, () => this._onEnded(master));
+    master.__pfFresh = false;
     this._set("connected");
     this._broadcast();
     this._wake();
-    console.log("[platform] one shared connection is up for @" + user + " (" + this.followers.size + " game(s) linked)");
+    console.log("[platform] one shared connection is up for @" + user + " (room " + (master.roomId || (state && state.roomId) || "?") + ", " + this.followers.size + " game(s) linked)");
+    this._armWatchdog(master, this.gen);
+    setTimeout(() => this._linkGames("connected").catch(() => {}), 400 * SCALE);
+  }
+
+  // ------------------------------------------------------------------ update 42: stale-room watchdog
+  // A connection can report "connected" while sitting in the room of an OLD live (or a room TikTok no longer feeds), so
+  // chat never arrives. If nothing at all arrives soon after connecting, compare with TikTok's current room for the
+  // host and reconnect from scratch (never reusing a remembered room id). At most 2 refreshes per Connect press.
+  _armWatchdog(master, gen) {
+    clearTimeout(this._wd);
+    let refreshes = 0;
+    const step = (delayMs) => {
+      this._wd = setTimeout(async () => {
+        try {
+          if (gen !== this.gen || master !== this.master || this.status !== "connected") return;
+          if (this.lastEventAt) return; // events are flowing - nothing to fix
+          let stale = false, why = "";
+          try {
+            const probe = await probeLive(this.username);
+            if (gen !== this.gen || master !== this.master) return;
+            if (probe.roomId && master.roomId && String(probe.roomId) !== String(master.roomId)) { stale = true; why = "TikTok's current room for @" + this.username + " is " + probe.roomId + ", this connection was on " + master.roomId; }
+          } catch (_) { /* probe is only a hint */ }
+          if (this.lastEventAt) return;
+          if (stale || refreshes < 2) {
+            refreshes += 1;
+            this.watchdogNote = stale ? "Old room detected - reconnected to the current LIVE." : "No data after connecting - reconnected from scratch.";
+            console.warn("[platform] watchdog: " + (why || "no events since connecting") + " -> fresh reconnect (" + refreshes + "/2)");
+            await this._refresh(master, gen);
+            if (gen === this.gen && master === this.master && this.status === "connected" && !this.lastEventAt && refreshes < 2) step(30000 * SCALE);
+          }
+        } catch (_) { /* never break the hub */ }
+      }, delayMs);
+      if (this._wd.unref) this._wd.unref();
+    };
+    step(30000 * SCALE);
+  }
+
+  async _refresh(master, gen) {
+    if (this._reconnecting) return;
+    this._reconnecting = true;
+    let handOff = false;
+    const user = this.username;
+    try {
+      this._set("reconnecting");
+      this.error = { code: "STALE_ROOM", title: "Refreshing the connection", detail: "No data arrived, so the platform is reconnecting from scratch to the current LIVE room.", fix: "Nothing to do - this takes a few seconds.", raw: "" };
+      this._broadcast();
+      try { await Promise.resolve(master.disconnect()); } catch (_) { /* already closed */ }
+      forgetRoom(user);
+      master.__pfFresh = true;
+      const state = await master.connect();
+      master.__pfFresh = false;
+      if (gen !== this.gen || master !== this.master) return;
+      this.masterState = state || this.masterState;
+      this.connectedAt = Date.now();
+      this.lastEventAt = 0;
+      this.error = null;
+      this._sawDisconnected = false;
+      this._set("connected");
+      this._broadcast();
+      try { master.emit("reconnected"); } catch (_) { /* followers only */ }
+      console.log("[platform] fresh reconnect done for @" + user + " (room " + (master.roomId || "?") + ")");
+    } catch (err) {
+      master.__pfFresh = false;
+      if (gen !== this.gen || master !== this.master) return;
+      this.error = explainTikTokErrorParts(err, user);
+      this._set("reconnecting");
+      this._broadcast();
+      handOff = true;
+      this._reconnecting = false; // the loop below sets it again for itself
+      this._reconnectLoop(master, gen).catch(() => {});
+      return;
+    } finally { if (!handOff && gen === this.gen) this._reconnecting = false; }
+  }
+
+  // ------------------------------------------------------------------ update 42: games linked by the hub itself
+  /** A game registers itself: link(username) switches it to Live + connects it (it gets the shared connection),
+   *  isLinked(username) says whether it already follows this username. No game page needs to be open. */
+  registerGame(name, link, isLinked) {
+    if (!name || typeof link !== "function") return;
+    this.games.set(String(name), { link, isLinked: typeof isLinked === "function" ? isLinked : null });
+  }
+  async _linkGames(reason) {
+    if (this.mode !== "live" || this.status !== "connected" || !this.master) return;
+    const gen = this.gen, user = this.username;
+    for (const [name, g] of this.games) {
+      if (gen !== this.gen || this.status !== "connected") return;
+      try {
+        if (g.isLinked && g.isLinked(user)) continue;
+        await g.link(user);
+      } catch (e) { console.warn("[platform] could not link " + name + " (" + reason + "): " + msgOf(e)); }
+    }
   }
 
   _observe(ev, args, master) {
@@ -293,7 +396,14 @@ class PlatformHubClass {
     this.lastEventAt = now;
     this.eventTimes.push(now);
     if (this.eventTimes.length > 4000) this.eventTimes.splice(0, 1000);
-    if (ev === EV_CHAT) this.chatCount += 1;
+    if (ev === EV_CHAT) {
+      this.chatCount += 1;
+      try {
+        const d = args[0] || {};
+        const u = (d.user && (d.user.uniqueId || d.user.nickname)) || d.uniqueId || d.nickname || "viewer";
+        this.lastChat = { user: String(u).slice(0, 40), text: String(d.comment || d.message || d.content || "").slice(0, 60), at: now };
+      } catch (_) { /* diagnostics only */ }
+    }
     if (ev === EV_ROOM_USER) {
       const d = args[0] || {};
       const v = Number(d.viewerCount != null ? d.viewerCount : d.userCount);
@@ -358,6 +468,7 @@ class PlatformHubClass {
 
   async _teardown(bump = true) {
     if (bump) this.gen += 1; // stops any connect / reconnect loop still running
+    clearTimeout(this._wd);
     const master = this.master;
     this.master = null;
     this.masterState = null;
@@ -469,7 +580,7 @@ class PlatformHubClass {
     else C("chat", "Chat connection open", "wait", "Not open.");
 
     if (connected) {
-      if (lastEvAge != null && lastEvAge <= SILENT_WARN_MS) C("events", "Live events arriving", "ok", "Last event " + fmtAge(lastEvAge) + " ago, " + this.chatCount + " chat message(s) so far.");
+      if (lastEvAge != null && lastEvAge <= SILENT_WARN_MS) C("events", "Live events arriving", "ok", "Last event " + fmtAge(lastEvAge) + " ago, " + this.chatCount + " chat message(s) so far." + (this.lastChat ? " Last comment: @" + this.lastChat.user + " - " + this.lastChat.text : ""));
       else if (lastEvAge == null && sinceConnect < FIRST_EVENT_GRACE_MS) C("events", "Live events arriving", "run", "Waiting for the first event...");
       else C("events", "Live events arriving", "warn", lastEvAge == null ? "Nothing received since connecting (" + fmtAge(sinceConnect) + ")." : "Nothing received for " + fmtAge(lastEvAge) + ".");
     } else C("events", "Live events arriving", "wait", "Starts once the chat is connected.");
@@ -529,6 +640,9 @@ class PlatformHubClass {
         connectedForMs: connected ? sinceConnect : null,
         lastEventAgoMs: lastEvAge,
         chatCount: this.chatCount,
+        lastChat: this.lastChat,
+        watchdogNote: this.watchdogNote || null,
+        registeredGames: [...this.games.keys()],
         eventsPerMinute: connected ? this.eventTimes.length : null,
         reconnectsLast10Min: recentReconnects,
         linkedGames: games,
