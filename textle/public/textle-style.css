@@ -1,0 +1,1004 @@
+/* ============================================================
+   TEXTLE — design tokens
+   ============================================================ */
+/* Backgrounds/surfaces/borders/ink now follow the platform's shared
+   theme picker (/shared/theme.css, loaded before this file) instead of
+   being hardcoded, so choosing a theme anywhere on the platform recolors
+   TEXTLE too. Gold/coral/success/violet stay as TEXTLE's own fixed
+   accent identity, same as Flagle/TRAVLE keep their bold accent colors.
+   --panel and --panel-light are deliberately two DIFFERENT shades (a
+   light elevated card, then a visibly deeper nested-panel tone) so
+   panels-within-panels actually separate from each other instead of
+   blending into one flat color. --text is body-text ink; --muted is a
+   softer secondary tone that stays legible without competing with --text. */
+:root {
+  --bg-stage: var(--theme-bg, #0d0f1f);
+  --panel: var(--theme-card, #171b3d);
+  --panel-light: var(--theme-surface-2, #212656);
+  --gold: #ffb100;
+  --gold-dim: #d99400;
+  --gold-text: #8A5A00; /* readable-as-TEXT variant of --gold — bright gold used for text on a light bg fails contrast; use this for labels/badges, keep --gold for solid-fill backgrounds/icons/borders */
+  --coral: #ff3b4e;
+  --success: #16d976;
+  --success-text: #0F7A3D; /* readable-as-TEXT variant of --success — same reasoning as --gold-text */
+  --violet: #7c5cff;
+  --text: var(--theme-ink, #f6f4ef);
+  --muted: var(--theme-ink-soft, #9aa0c3);
+  --heading: var(--theme-deep, #f6f4ef);
+  --border: var(--theme-line, rgba(60, 40, 20, 0.278));
+  --shadow: 0 14px 32px var(--theme-shadow, rgba(2, 3, 12, 0.35));
+  --radius-lg: 22px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-stage);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app {
+  height: calc(var(--vh, 1vh) * 100);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background:
+    radial-gradient(ellipse 900px 500px at 50% -8%, rgba(255, 177, 0, 0.16), transparent 60%),
+    radial-gradient(ellipse 700px 400px at 100% 110%, rgba(255, 59, 78, 0.11), transparent 60%),
+    var(--bg-stage);
+}
+
+button, input, select { font-family: var(--font-body); color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+/* ============================================================
+   Header
+   ============================================================ */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* Extra top padding reserves space for TikTok LIVE's own on-screen UI
+     (viewer name, live badge, gift/exit icons) so it never covers the
+     top bar — see --live-safe-top in /shared/theme.css. */
+  padding: calc(8px + var(--live-safe-top)) 10px 8px;
+  background: rgba(20, 23, 42, 0.9);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  gap: 6px;
+  /* Single row, always - see .toolbarRow below for how every control in
+     it is sized to actually fit alongside the brand at ordinary 100%
+     zoom, with nothing wrapping, scrolling, or hidden off-screen. */
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+.brandRow { display: flex; align-items: center; gap: 6px; min-width: 0; flex-shrink: 1; }
+.brandDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(60, 40, 20, 0.163);
+}
+.brandDot.live { background: var(--success); box-shadow: 0 0 0 3px rgba(22, 217, 118, 0.18); }
+.brandDot.test_mode { background: var(--violet); box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.18); }
+.brandDot.connecting, .brandDot.retrying { background: var(--gold); animation: pulse 1.1s ease-in-out infinite; }
+.brandDot.error { background: var(--coral); }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+.brandTitle {
+  font-family: var(--font-display); font-weight: 700; font-size: 15px; line-height: 1.1; color: var(--heading);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.brandTitle .accent { color: var(--gold-text); text-shadow: 0 0 18px rgba(255, 177, 0, 0.45); }
+/* The tagline is dropped from the compact single-row header (see
+   .toolbarRow below) so the row has room for every button - it isn't
+   needed to understand or play the game. Markup is left in place rather
+   than deleted in case a future wider layout wants it back. */
+.brandSubtitle { display: none; }
+
+.toolbarRow {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+/* Everything in the toolbar (icons + the two badges) is sized down
+   specifically HERE, scoped to .toolbarRow only, so nothing elsewhere
+   in the app (drawer close buttons, celebration close button, etc.)
+   is affected - only this one row needs to be this compact to fit
+   home + hint + help + leaderboard + settings + fullscreen, the mode
+   badge, and the length badge on a single line without wrapping,
+   scrolling, or relying on the browser being zoomed out. */
+.toolbarRow .modeBadge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(124, 92, 255, 0.16);
+  color: var(--violet);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.toolbarRow .modeBadge.live { background: rgba(22, 217, 118, 0.16); color: var(--success-text); }
+.toolbarRow .modeBadge.offline { background: rgba(60, 40, 20, 0.255); color: var(--muted); }
+
+.toolbarRow .lengthBadge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(60, 40, 20, 0.186);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.toolbarRow .iconBtn {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.iconBtn {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(60, 40, 20, 0.117);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.iconBtn:active { transform: scale(0.94); }
+.iconBtn:disabled { opacity: 0.35; cursor: not-allowed; }
+.iconBtn.active { background: rgba(255, 177, 0, 0.18); border-color: rgba(255, 177, 0, 0.4); color: var(--gold-text); }
+.iconBadge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: var(--gold);
+  color: #241a05;
+  font-size: 10px;
+  font-weight: 800;
+  min-width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 2px;
+}
+.iconBadge.hidden { display: none; }
+
+/* ============================================================
+   Main stage
+   ============================================================ */
+.stage {
+  flex: 1;
+  padding: 14px 14px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.round-card {
+  background: linear-gradient(180deg, var(--panel-light), var(--panel));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 16px;
+  box-shadow: var(--shadow);
+}
+
+/* ---- Tile grid: avatar, then the word, then counts immediately after
+   the last letter — all left-packed on one line (no stretched gap). ---- */
+.tilesWrap { display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin-bottom: 4px; }
+.guessBlock { position: relative; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px; width: 100%; }
+/* Update 16: the guessed tiles sit in the CENTER of the board; the guesser's avatar stays pinned to the left edge. */
+.guessBlock > .guessAvatar, .guessBlock > .guessAvatarSpacer { position: absolute; left: 0; top: 50%; transform: translateY(-50%); }
+.tileRow { display: flex; gap: 6px; flex-wrap: nowrap; flex: 0 0 auto; min-width: 0; }
+.guessAvatar {
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  user-select: none;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+}
+.guessAvatarSpacer { flex-shrink: 0; visibility: hidden; }
+.avatarImg { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
+/* Shared circular avatar chip used in leaderboards and the win banner
+   (the bigger, per-guess-row avatar above has its own .guessAvatar
+   sizing but reuses .avatarImg for the actual photo). */
+.lbAvatar {
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+}
+.lbAvatarFallback {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  user-select: none;
+}
+.tile {
+  width: 34px;
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  border-radius: 8px;
+  background: rgba(60, 40, 20, 0.117);
+  border: 1px solid var(--border);
+  color: var(--text);
+  text-transform: uppercase;
+}
+.tile.filled { border-color: rgba(60, 40, 20, 0.42); background: rgba(60, 40, 20, 0.186); animation: tile-pop 0.28s ease; cursor: pointer; user-select: none; }
+.tile.filled:active { transform: scale(0.93); }
+.tile.filled.correct { background: var(--success); color: #08301a; border-color: transparent; }
+.tile.filled.present { background: var(--gold); color: #2c1f04; border-color: transparent; }
+.tile.filled.absent { background: rgba(255, 59, 78, 0.3); color: #7A1620; border-color: transparent; }
+@keyframes tile-pop {
+  0% { transform: scale(0.85); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.tile.current { border-color: rgba(255, 177, 0, 0.5); animation: current-pulse 1.6s ease-in-out infinite; }
+@keyframes current-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 177, 0, 0.25); }
+  50% { box-shadow: 0 0 0 4px rgba(255, 177, 0, 0.12); }
+}
+
+.countsCol { display: flex; flex-direction: row; gap: 3px; flex-shrink: 0; align-items: center; }
+.countBadge {
+  border-radius: 5px;
+  padding: 0 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+.countBadge.green { background: rgba(22, 217, 118, 0.18); color: var(--success-text); }
+.countBadge.gold { background: rgba(255, 177, 0, 0.18); color: var(--gold-text); }
+.countBadge.red { background: rgba(255, 59, 78, 0.26); color: #7A1620; }
+
+.hintExplainer { text-align: center; font-size: 12px; color: var(--muted); margin: -4px 0 10px; }
+.hintChips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 12px; }
+.hintChip {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 177, 0, 0.14);
+  color: var(--gold-text);
+  border: 1px solid rgba(255, 177, 0, 0.3);
+}
+
+/* Reserved slot for the floating rejection window: sits directly above the keyboard,
+   pushing the keyboard and board down so they never overlap the message. */
+.toastSlot {
+  position: relative;
+  flex-shrink: 0;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  height: var(--toast-slot-height, 76px);
+  pointer-events: none;
+}
+/* ---- Rejection toast: brief, self-dismissing ----
+   Positioned absolutely INSIDE the reserved .toastSlot above the keyboard, so it
+   floats in its own layer and showing or hiding it never resizes or shifts anything
+   underneath it
+   (specifically: it never pushes the guessed-words section down).
+   Styled for readability at a glance: solid (non-translucent) dark
+   card, generous padding, larger/bolder text, soft shadow for
+   separation from whatever's behind it. Duration is host-configurable
+   (Settings → "Guess rejection message") and applied inline via JS as
+   the animation's duration - see maybeShowRejection() in game.js. */
+.rejectionToast {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  pointer-events: none;
+  width: min(92vw, 480px);
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  background: rgba(28, 16, 22, 0.96);
+  border: 1px solid rgba(255, 59, 78, 0.45);
+  box-shadow: 0 14px 32px rgba(2, 3, 12, 0.55);
+  color: #ffd7db;
+  font-size: 13.5px;
+  line-height: 1.4;
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: 0.1px;
+}
+.rejectionToast::before {
+  content: "";
+  display: block;
+  width: 34px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--coral);
+  margin: 0 auto 8px;
+}
+@keyframes toast-flash {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+  10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  85% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ---- Offline / live notes ---- */
+.offlineNote, .liveNote {
+  text-align: center;
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+.offlineNote {
+  background: rgba(124, 92, 255, 0.1);
+  border: 1px solid rgba(124, 92, 255, 0.25);
+  color: var(--violet);
+}
+.liveNote {
+  background: rgba(255, 177, 0, 0.08);
+  border: 1px solid rgba(255, 177, 0, 0.2);
+  color: var(--gold-dim);
+}
+.offlineNote p, .liveNote p { margin: 0; }
+
+/* ---- Result / idle banners ---- */
+.resultBanner, .idleBanner {
+  text-align: center;
+  padding: 16px 14px;
+  border-radius: var(--radius-md);
+  margin-bottom: 14px;
+}
+.resultBanner p, .idleBanner p { margin: 0 0 12px; font-size: 15px; font-weight: 600; }
+.resultBanner.win { background: rgba(22, 217, 118, 0.13); border: 1px solid rgba(22, 217, 118, 0.32); color: var(--success-text); }
+.resultBanner.lost { background: rgba(255, 59, 78, 0.16); border: 1px solid rgba(255, 59, 78, 0.4); color: #7A1620; }
+.idleBanner { background: rgba(60, 40, 20, 0.094); border: 1px dashed var(--border); color: var(--muted); }
+.idleBanner p { font-weight: 500; margin: 0; }
+.autoContinueNote { margin: 10px 0 0 !important; font-size: 12px !important; font-weight: 500 !important; opacity: 0.85; }
+
+/* ---- Keyboard: its own section, above the guessed words ---- */
+.keyboardSection {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(60, 40, 20, 0.094);
+  padding: 12px 12px 14px;
+  margin-bottom: 16px;
+}
+.keyboardHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.keyboardTitle { font-family: var(--font-display); font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.keyboard { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.keyRow { display: flex; flex-wrap: nowrap; gap: 5px; justify-content: center; }
+.key {
+  flex-shrink: 0;
+  padding: 0 4px;
+  border-radius: 7px;
+  background: rgba(60, 40, 20, 0.209);
+  border: none;
+  color: var(--text);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: uppercase;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.08s ease;
+}
+.key:active { transform: scale(0.92); }
+.key.correct { background: var(--success); color: #08301a; }
+.key.present { background: var(--gold); color: #2c1f04; }
+.key.absent { background: rgba(255, 59, 78, 0.28); color: #7A1620; }
+.key.used { background: rgba(60, 40, 20, 0.071); color: var(--muted); }
+
+/* ============================================================
+   Host controls (sticky bottom)
+   ============================================================ */
+.controls {
+  position: sticky;
+  bottom: 0;
+  z-index: 30;
+  background: rgba(20, 23, 42, 0.97);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -14px 32px rgba(4, 5, 14, 0.5);
+}
+.controlsHandle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 9px;
+}
+.handleArrow { transition: transform 0.2s ease; }
+.controlsHandle[aria-expanded="false"] .handleArrow { transform: rotate(-90deg); }
+.controlsBody { padding: 4px 16px 16px; display: flex; flex-direction: column; gap: 10px; max-width: 640px; margin: 0 auto; }
+.controlsBody.collapsed { display: none; }
+.modeControls[hidden] { display: none; }
+.row { display: flex; gap: 8px; align-items: center; }
+.textInput, .selectInput {
+  flex: 1;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 11px 12px;
+  font-size: 14px;
+  color: var(--text);
+}
+.selectNarrow { flex: 0 0 84px; }
+.textInput::placeholder { color: var(--muted); }
+.btn {
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 11px 16px;
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+  transition: transform 0.08s ease, opacity 0.15s ease;
+}
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btnPrimary { background: var(--coral); color: #260f0c; }
+.btnGold { background: var(--gold); color: #241a05; }
+.btnGhost { background: rgba(60, 40, 20, 0.186); color: var(--text); border: 1px solid var(--border); }
+.btnDanger { background: rgba(255, 59, 78, 0.14); color: #7A1620; border: 1px solid rgba(255, 59, 78, 0.4); margin-bottom: 8px; }
+.btnFull { width: 100%; }
+.miniStatus { margin: 0; font-size: 12px; color: var(--muted); min-height: 16px; }
+
+/* ============================================================
+   Drawers (Settings / Leaderboard) — slide in from the right
+   ============================================================ */
+.drawerOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 7, 16, 0.6);
+  backdrop-filter: blur(3px);
+  z-index: 60;
+  display: flex;
+  justify-content: flex-end;
+}
+.drawerOverlay[hidden] { display: none; }
+.drawer {
+  width: 100%;
+  max-width: 400px;
+  height: 100%;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  padding: 18px 18px 32px;
+  overflow-y: auto;
+  animation: drawer-in 0.22s ease;
+}
+@keyframes drawer-in { from { transform: translateX(24px); opacity: 0.5; } to { transform: translateX(0); opacity: 1; } }
+.drawerHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.drawerHead h3 { margin: 0; font-family: var(--font-display); font-size: 19px; color: var(--heading); }
+
+.statusChips { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.statusChip {
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(60, 40, 20, 0.117);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.statusChip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+.statusChip.good .dot { background: var(--success); }
+.statusChip.bad .dot { background: var(--coral); }
+.statusChip.warn .dot { background: var(--gold); }
+
+.drawerSection { margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.drawerSection:last-child { border-bottom: none; }
+.drawerSection h4 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sectionNote { font-size: 12px; color: var(--muted); margin: 6px 0 10px; }
+.fieldLabel { font-size: 12px; color: var(--muted); display: block; margin-bottom: 6px; }
+.delayLabel { flex: 1; margin-bottom: 0; }
+
+.pickerRow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(60, 40, 20, 0.117);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+.chev { color: var(--muted); }
+
+.linkBtn { background: none; border: none; color: var(--muted); font-size: 11px; text-transform: none; letter-spacing: 0; cursor: pointer; padding: 2px 4px; }
+
+.diagGrid { display: grid; grid-template-columns: 1fr; gap: 8px; font-size: 12.5px; }
+.diagRow { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--border); }
+.diagRow:last-child { border-bottom: none; }
+.diagKey { color: var(--muted); }
+.diagVal { font-weight: 600; text-align: right; }
+.diagVal.warn { color: var(--gold-text); }
+.diagVal.bad { color: #C81E36; font-weight: 700; }
+.diagVal.good { color: var(--success-text); }
+
+.switchRow { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+.switchRow input { position: absolute; opacity: 0; width: 0; height: 0; }
+.switchTrack { width: 38px; height: 22px; border-radius: 999px; background: rgba(60, 40, 20, 0.301); position: relative; flex-shrink: 0; transition: background 0.2s ease; }
+.switchThumb { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--text); transition: transform 0.2s ease; }
+.switchRow input:checked + .switchTrack { background: var(--gold); }
+.switchRow input:checked + .switchTrack .switchThumb { transform: translateX(16px); background: #241a05; }
+.switchLabel { flex: 1; }
+
+/* ---- Mode picker popup ---- */
+.pickerOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 7, 16, 0.6);
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.pickerOverlay[hidden] { display: none; }
+.pickerSheet {
+  width: 100%;
+  max-width: 360px;
+  background: var(--panel-light);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.pickerOption {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 16px;
+  text-align: left;
+  color: var(--text);
+}
+.pickerOption:last-child { border-bottom: none; }
+.pickerRadio {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--muted);
+  flex-shrink: 0;
+  position: relative;
+}
+.pickerOption.selected .pickerRadio { border-color: var(--gold); }
+.pickerOption.selected .pickerRadio::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+.pickerTextWrap { display: flex; flex-direction: column; gap: 2px; }
+.pickerTitle { font-weight: 700; font-size: 14px; }
+.pickerDesc { font-size: 12px; color: var(--muted); }
+
+/* ---- Leaderboard tabs ---- */
+.tabRow { display: flex; gap: 8px; margin-bottom: 14px; }
+.tabBtn {
+  flex: 1;
+  background: rgba(60, 40, 20, 0.117);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 9px;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--muted);
+}
+.tabBtn.active { background: var(--gold); color: #241a05; border-color: transparent; }
+
+.leaderboard { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.leaderboard li { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: var(--radius-sm); background: rgba(60, 40, 20, 0.094); font-size: 14px; }
+.leaderboard li.empty { color: var(--muted); justify-content: center; background: none; text-align: center; }
+.leaderboard .rank { font-family: var(--font-display); font-weight: 700; color: var(--gold-dim); width: 20px; flex-shrink: 0; }
+.leaderboard li:nth-child(1) .rank { color: var(--gold-text); }
+.leaderboard .lbName { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leaderboard .lbScore { font-weight: 700; }
+
+/* ============================================================
+   How-to-play modal
+   ============================================================ */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 7, 16, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 80;
+}
+.modalOverlay[hidden] { display: none; }
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 20px 20px 0 0;
+  padding: 20px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 82vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow);
+}
+@media (min-width: 560px) {
+  .modalOverlay { align-items: center; }
+  .modal { border-radius: 20px; }
+}
+.modalHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.modalHead h3 { margin: 0; font-family: var(--font-display); font-size: 18px; color: var(--heading); }
+.howToList { margin: 0 0 16px; padding-left: 18px; display: flex; flex-direction: column; gap: 10px; font-size: 14px; color: var(--muted); }
+.howToList li strong { color: var(--text); }
+.legendTile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  font-weight: 700;
+  font-size: 12px;
+  margin-right: 4px;
+}
+.legendTile.correct { background: var(--success); color: #08301a; }
+.legendTile.present { background: var(--gold); color: #2c1f04; }
+.legendTile.absent { background: rgba(255, 59, 78, 0.28); color: #7A1620; }
+
+@media (min-width: 720px) {
+  .stage { padding: 22px 16px 30px; }
+  .tile { width: 44px; height: 50px; font-size: 22px; }
+}
+
+/* Extra safety margin on genuinely tiny screens (very old/small phones)
+   so the toolbar row still fits without wrapping or scrolling. */
+@media (max-width: 340px) {
+  .topbar { padding: 6px 8px; gap: 4px; }
+  .toolbarRow { gap: 2px; }
+  .toolbarRow .iconBtn { width: 23px; height: 23px; font-size: 11px; border-radius: 7px; }
+  .toolbarRow .modeBadge, .toolbarRow .lengthBadge { font-size: 8px; padding: 2px 5px; }
+  .brandTitle { font-size: 13px; }
+  .brandDot { width: 7px; height: 7px; }
+}
+
+/* ============================================================
+   Win celebration confetti
+   ============================================================ */
+.confettiLayer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 90;
+  overflow: hidden;
+}
+.confettiPiece {
+  position: absolute;
+  top: -12px;
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  opacity: 0.95;
+  animation: confetti-fall linear forwards;
+}
+@keyframes confetti-fall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(105vh) rotate(540deg); opacity: 0.3; }
+}
+
+/* ============================================================
+   Win celebration: sequence of centered floating windows
+   ============================================================ */
+.celebrationOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(4, 5, 14, 0.72);
+  backdrop-filter: blur(4px);
+}
+.celebrationOverlay[hidden] { display: none; }
+
+.celebrationCard {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  background: linear-gradient(180deg, var(--panel-light), var(--panel));
+  border: 1px solid rgba(255, 177, 0, 0.4);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 0 0 1px rgba(255, 177, 0, 0.08), 0 30px 60px rgba(2, 3, 12, 0.7);
+  padding: 30px 22px 20px;
+  text-align: center;
+  animation: celeb-pop 0.32s cubic-bezier(0.2, 0.8, 0.3, 1.2);
+}
+@keyframes celeb-pop {
+  0% { transform: scale(0.85); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.celebrationClose {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.celebrationBody { min-height: 140px; display: flex; flex-direction: column; justify-content: center; gap: 10px; }
+
+.celebLabel {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold-text);
+}
+.celebWinnerRow {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 20px;
+  color: var(--text);
+  word-break: break-word;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.celebAnswerRow {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 36px;
+  letter-spacing: 0.03em;
+  color: var(--success-text);
+  text-shadow: 0 0 22px rgba(22, 217, 118, 0.4);
+  word-break: break-word;
+  margin-top: 2px;
+}
+.celebPoints { font-size: 13px; color: var(--gold-dim); font-weight: 600; }
+
+.celebBoardTitle {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+.celebBoardList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.celebBoardList li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(60, 40, 20, 0.117);
+  font-size: 14px;
+}
+.celebBoardList li.empty { color: var(--muted); justify-content: center; text-align: center; }
+.celebBoardList .rank { font-family: var(--font-display); font-weight: 700; color: var(--gold-dim); width: 20px; flex-shrink: 0; }
+.celebBoardList li:nth-child(1) .rank { color: var(--gold-text); }
+.celebBoardList .lbName { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.celebBoardList .lbScore { font-weight: 700; }
+
+.celebrationDots { display: flex; justify-content: center; gap: 6px; margin-top: 18px; }
+.celebDot { width: 6px; height: 6px; border-radius: 50%; background: rgba(60, 40, 20, 0.42); }
+.celebDot.active { background: var(--gold); }
+
+
+/* ==========================================================================
+   TEXTLE additions - colored SEGMENTS instead of letter tiles + count badges,
+   and a read-only keyboard that colors itself (green / yellow / gray).
+   ========================================================================== */
+:root{
+  --tx-green:  #0E9F45;  --tx-green-dark:  #087A32;
+  --tx-yellow: #FFC400;  --tx-yellow-dark: #D9A100;
+  --tx-gray:   #7B8092;  --tx-gray-dark:   #5A5F70;
+}
+
+/* One colored box per segment (several letters can share one box). */
+.seg {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  text-transform: uppercase;
+  user-select: none;
+  cursor: default;
+  animation: tile-pop 0.28s ease;
+  overflow: hidden;
+}
+.segLetter { flex: 1 1 0; min-width: 0; text-align: center; line-height: 1; }
+.seg.green  { background: var(--tx-green);  color: var(--tx-green-ink, #fff);    box-shadow: inset 0 -3px 0 var(--tx-green-dark); }
+.seg.yellow { background: var(--tx-yellow); color: var(--tx-yellow-ink, #241a00); box-shadow: inset 0 -3px 0 var(--tx-yellow-dark); }
+.seg.gray   { background: var(--tx-gray);   color: var(--tx-gray-ink, #fff);    box-shadow: inset 0 -3px 0 var(--tx-gray-dark); }
+
+/* The keyboard is display-only: nothing to click, no manual coloring. */
+.key { cursor: default; font-weight: 700; }
+.key:active { transform: none; }
+.key.green  { background: var(--tx-green);  color: var(--tx-green-ink, #fff);    box-shadow: inset 0 -3px 0 var(--tx-green-dark); font-weight: 800; }
+.key.yellow { background: var(--tx-yellow); color: var(--tx-yellow-ink, #241a00); box-shadow: inset 0 -3px 0 var(--tx-yellow-dark); font-weight: 800; }
+.key.gray   { background: var(--tx-gray);   color: var(--tx-gray-ink, #fff);    box-shadow: inset 0 -3px 0 var(--tx-gray-dark); font-weight: 800; }
+.keyRow { gap: 4px; }
+
+/* How-to-play legend swatches */
+.legendTile.green  { background: var(--tx-green);  color: var(--tx-green-ink, #fff); }
+.legendTile.yellow { background: var(--tx-yellow); color: var(--tx-yellow-ink, #241a00); }
+.legendTile.gray   { background: var(--tx-gray);   color: var(--tx-gray-ink, #fff); }
+.legendTile { width: auto; min-width: 22px; padding: 0 7px; }
+.legendTile.capped { border-radius: 11px 5px 5px 11px; }
+
+.howToSub { margin: 6px 0 0; padding-left: 16px; display: flex; flex-direction: column; gap: 6px; list-style: disc; }
+
+/* ============================================================
+   Toolbar: 9 buttons now fit on one row - slightly tighter sizing
+   (loads before game-chrome.css, so selectors are more specific)
+   ============================================================ */
+.topbar .toolbarRow { gap: 2px; }
+.topbar .toolbarRow .iconBtn {
+  width: clamp(24px, 7.3vw, 36px);
+  height: clamp(24px, 7.3vw, 36px);
+  font-size: clamp(11px, 3.4vw, 15px);
+}
+.toolbarRow .lengthBadge[hidden] { display: none !important; }
+
+/* ============================================================
+   Toolbar dropdown menus (mode + theme)
+   ============================================================ */
+.tbMenu {
+  position: fixed;
+  z-index: 90;
+  min-width: 232px;
+  max-width: calc(100vw - 16px);
+  background: var(--panel-light);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tbMenu[hidden] { display: none; }
+.tbMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 10px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.tbMenuItem:hover { background: rgba(60, 40, 20, 0.08); }
+.tbMenuItem.selected { background: rgba(255, 177, 0, 0.16); border-color: rgba(255, 177, 0, 0.45); }
+.tbMenuIcon { font-size: 18px; width: 24px; text-align: center; flex-shrink: 0; }
+.tbMenuText { display: flex; flex-direction: column; flex: 1; min-width: 0; line-height: 1.2; }
+.tbMenuText b { font-size: 14px; font-weight: 700; }
+.tbMenuText small { font-size: 11.5px; color: var(--muted); }
+.tbMenuCheck { visibility: hidden; font-weight: 800; color: var(--gold-text); }
+.tbMenuItem.selected .tbMenuCheck { visibility: visible; }
+.tbSwatch {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid; flex-shrink: 0;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.55);
+}
+
+/* ============================================================
+   Live connect floating window
+   ============================================================ */
+.liveModal { max-width: 380px; }
+.liveModal .row { margin-top: 10px; }
+.liveModal .row .textInput { width: 100%; }
+.connStatus {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(60, 40, 20, 0.07);
+}
+.connIcon {
+  flex: 0 0 auto;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 800;
+  background: rgba(60, 40, 20, 0.18);
+  color: var(--text);
+}
+.connText { min-width: 0; }
+.connTitle { font-weight: 800; font-size: 14px; }
+.connDetail { font-size: 12.5px; line-height: 1.4; margin-top: 2px; color: var(--muted); word-break: break-word; }
+.connStatus[data-state="connecting"] .connIcon { background: rgba(255, 177, 0, 0.3); animation: pulse 1.1s ease-in-out infinite; }
+.connStatus[data-state="success"] { background: rgba(22, 217, 118, 0.14); border-color: rgba(22, 217, 118, 0.5); }
+.connStatus[data-state="success"] .connIcon { background: #16a85e; color: #fff; }
+.connStatus[data-state="success"] .connTitle { color: var(--success-text); }
+.connStatus[data-state="error"] { background: rgba(255, 59, 78, 0.12); border-color: rgba(255, 59, 78, 0.5); }
+.connStatus[data-state="error"] .connIcon { background: #d8334a; color: #fff; }
+.connStatus[data-state="error"] .connTitle { color: #b3202f; }
