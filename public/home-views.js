@@ -183,11 +183,12 @@
     if (tab) settingsTab = tab;
     var m = el("div", "hv-modal"), tb = el("div", "hv-st"), body = el("div", "hv-sbody");
     m.appendChild(mHead("⚙️ Home settings"));
-    var tabs = [["mode", "📡 Mode"], ["cards", "🎴 Cards"], ["find", "🔎 Find"], ["layout", "🎛 Layout"], ["groups", "🗂️ Groups"]];
+    var tabs = [["mode", "📡 Mode"], ["records", "📜 Records"], ["cards", "🎴 Cards"], ["find", "🔎 Find"], ["layout", "🎛 Layout"], ["groups", "🗂️ Groups"]];
     function show() {
       body.innerHTML = ""; statusEl = null;
       Array.prototype.forEach.call(tb.children, function (b, i) { b.classList.toggle("on", tabs[i][0] === settingsTab); });
       if (settingsTab === "mode") { if (window.PlatformHome) window.PlatformHome.renderModePanel(body); else body.appendChild(el("p", "hv-help", "Loading...")); }
+      else if (settingsTab === "records") { var rb = el("a", "hv-add", "↗ Open the Records page"); rb.href = "/records.html"; rb.style.display = "block"; rb.style.textAlign = "center"; rb.style.textDecoration = "none"; body.appendChild(rb); var rh = el("div"); body.appendChild(rh); var go = function () { if (window.RecordsUI) window.RecordsUI.mount(rh); else rh.appendChild(el("p", "hv-help", "Loading...")); }; if (window.RecordsUI) go(); else { var sc = document.createElement("script"); sc.src = "/shared/records-ui.js"; sc.onload = go; document.head.appendChild(sc); } }
       else if (settingsTab === "cards") { if (window.PlatformHome) window.PlatformHome.renderCardsPanel(body); else body.appendChild(el("p", "hv-help", "Loading...")); }
       else if (settingsTab === "find") findPanel(body); else if (settingsTab === "layout") layoutPanel(body); else groupsPanel(body);
     }
@@ -354,6 +355,7 @@
     if (e.key === "Escape") { if (!ov.hidden) closeOv(); else if (e.target === search && search.value) { search.value = ""; apply(true); } return; }
     if (typing || e.ctrlKey || e.metaKey || e.altKey || !ov.hidden) return;
     if (e.key === "/") { e.preventDefault(); openSettings("find"); }
+    else if ((e.key === "r" || e.key === "R") && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); openSettings("records"); }
     else if (e.key === "[") step(-1);
     else if (e.key === "]") step(1);
     else if (view === "spotlight" && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {

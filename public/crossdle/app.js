@@ -436,6 +436,7 @@
 
   function renderGame(game) {
     if (!game) return;
+    if (window.WordLanguage) window.WordLanguage.update(game, (mode) => socket.emit('host:setWordLanguage', { mode })); // update 48: word language
     if (strictFitToggle) strictFitToggle.checked = game.strictFit !== false; // Strict fit is ON unless the host switched it off
     if (keyAutoColorToggle) keyAutoColorToggle.checked = game.keyAutoColor !== false; // ON unless the host switched it off
     if (starterWordToggle) starterWordToggle.checked = game.starterWord !== false; // ON unless the host switched it off

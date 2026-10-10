@@ -13,6 +13,7 @@
 <link rel="stylesheet" href="/shared/color-shades.css" />
 <script src="/shared/color-shades.js" data-game="flagle"></script>
 <link rel="stylesheet" href="style.css" />
+<script src="/shared/score-ticker.js"></script>
 </head>
 <body>
 
@@ -87,6 +88,7 @@
       </div>
       <div class="round-timer" id="round-timer">45</div>
       <div class="topbar-right">
+        <button type="button" id="leaderboard-btn" class="icon-btn" title="Leaderboard" aria-label="Leaderboard">🏆</button>
         <button type="button" id="settings-btn" class="icon-btn" title="Host settings">⚙️</button>
         <button type="button" id="fullscreen-btn" class="icon-btn" title="Toggle fullscreen">⛶</button>
         <span id="heartbeat" class="heartbeat">🎧 0</span>
@@ -141,6 +143,24 @@
 
     <div id="toast-layer"></div>
 
+    <!-- Leaderboard drawer (update 46: same layout as the word games - This session / All-time tabs) -->
+    <div class="settingsOverlay" id="leaderboard-overlay" hidden>
+      <div class="settingsPanel">
+        <div class="settingsHead">
+          <h3>Leaderboard</h3>
+          <button class="icon-btn" id="leaderboard-close" type="button" aria-label="Close">✕</button>
+        </div>
+        <div class="settingsBody">
+          <div class="lbTabs">
+            <button type="button" class="lbTab active" id="lb-tab-session">This session</button>
+            <button type="button" class="lbTab" id="lb-tab-alltime">All-time</button>
+          </div>
+          <ol class="lbList" id="lb-list"></ol>
+          <p class="settings-note" id="lb-note" hidden></p>
+        </div>
+      </div>
+    </div>
+
     <!-- Host settings drawer -->
     <div class="settingsOverlay" id="settings-overlay" hidden>
       <div class="settingsPanel">
@@ -171,6 +191,12 @@
           <div class="settingsField">
             <label class="field-label" for="setting-reveal-pause">Pause between rounds (seconds)</label>
             <input type="number" id="setting-reveal-pause" class="settings-input" min="2" max="30" step="1" />
+          </div>
+
+          <div class="settingsField">
+            <label class="field-label" for="setting-lb-seconds">Show leaderboard for (seconds)</label>
+            <input type="number" id="setting-lb-seconds" class="settings-input" min="1" max="30" step="1" />
+            <p class="settings-note">After a win, the winner, this session's leaderboard and the all-time leaderboard pop up one after another, each for this long. Applies right away.</p>
           </div>
 
           <button id="settings-apply" class="primary-btn" type="button">Apply settings &amp; start new round</button>

@@ -996,6 +996,8 @@ function escapeHtml(str) {
 
 function render(state) {
   lastState = state;
+  if (window.ScoreTicker) window.ScoreTicker.update(state); // update 47: scrolling top-scorers ticker
+  if (window.WordLanguage) window.WordLanguage.update(state.game, (mode) => socket.emit("host:setWordLanguage", { mode })); // update 48: word language
   detectWinTransition(state.game);
   detectFreshRound(state.game);
   renderHeader(state);

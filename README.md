@@ -1,4 +1,7 @@
 # TikTok LIVE Game Platform
+> **Update 48:** every word game (all except FLAGLE and TRAVLE) can now be played in **English, Bahasa Indonesia, Bahasa Melayu (Malaysia)** or any of **4 mixes** - Settings -> Word language - see `CHANGES_UPDATE_48.md`.
+> **Update 41:** fixed "Cannot GET /records" - the Records page now opens from `/records`, `/records.html`, every button and every game (explicit server route added).
+> **Update 40:** new **📜 Records** archive - every gift, like, share, follow and milestone is saved with time, viewer, audience, game and host (open `/records`, the 📜 button on HOME, or Settings → Open Records in any game) - plus far more milestone stages with Bronze→Mythic tiers - see `CHANGES_UPDATE_40.md`.
 > **Update 39:** guess tiles no longer shrink as guesses pile up - the board scrolls (auto-scroll + manual), and a Settings switch turns tile auto-resizing on/off for long words - see `CHANGES_UPDATE_39.md`.
 > **Update 38:** HOME now has a platform-wide **Offline / Test / Live** switch (⚙️ Home settings → Mode), ONE shared TikTok connection for every game, and a floating connection window with detailed status and exact reasons. "Customize Game Cards" moved to ⚙️ Home settings → Cards - see `CHANGES_UPDATE_38.md`.
 > **Update 32:** SHAPEDLE audience profile pictures are ticked automatically (untick or remove anyone), and the legend entries (order, text, colors) always apply - see `CHANGES_UPDATE_32.md`.

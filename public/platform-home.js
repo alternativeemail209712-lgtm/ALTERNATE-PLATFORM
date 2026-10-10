@@ -95,6 +95,11 @@
       else openWindow();
     };
     tools.insertBefore(pill, tools.firstChild);
+    // update 40: one-tap shortcut to the Records archive (also: press R, or open /records)
+    var rec = el("button", "cu-open pf-records", "📜");
+    rec.type = "button"; rec.title = "Records: every gift, like, milestone and who did it (press R)"; rec.setAttribute("aria-label", "Open records");
+    rec.onclick = function () { if (window.HomeSettings) window.HomeSettings.open("records"); else window.location.href = "/records.html"; };
+    tools.insertBefore(rec, pill.nextSibling);
   }
   function paintPill() {
     if (!pill) return;

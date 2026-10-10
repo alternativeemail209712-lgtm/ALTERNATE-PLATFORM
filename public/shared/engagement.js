@@ -181,7 +181,7 @@
     return (n || 0).toLocaleString();
   }
 
-  let lastCounters = null;
+  let lastCounters = null, lastCounting = null;
   function paintStats() {
     if (!lastCounters) return;
     const map = {
@@ -191,7 +191,9 @@
       likes: lastCounters.totalLikes,
     };
     document.querySelectorAll("[data-eng-stat]").forEach((el) => {
-      el.textContent = fmt(map[el.getAttribute("data-eng-stat")]);
+      const k = el.getAttribute("data-eng-stat");
+      if (k === "tiktoklikes") el.textContent = lastCounting && lastCounting.tiktokRoomLikes != null ? fmt(lastCounting.tiktokRoomLikes) : "–";
+      else el.textContent = fmt(map[k]);
     });
   }
 
@@ -203,11 +205,20 @@
       <div class="eng-tools">
         <div class="eng-tools-block">
           <div class="eng-tools-title">📊 Live statistics</div>
-          <p class="eng-tools-note">Running totals since the server started.</p>
+          <p class="eng-tools-note">Counted once per TikTok message, restarted from zero for every new LIVE. Test buttons never change these numbers.</p>
           <div class="eng-tools-row"><span>Total Gifts</span><b data-eng-stat="gifts">0</b></div>
           <div class="eng-tools-row"><span>Total Coins</span><b data-eng-stat="coins">0</b></div>
           <div class="eng-tools-row"><span>Total Shares</span><b data-eng-stat="shares">0</b></div>
-          <div class="eng-tools-row"><span>Total Likes</span><b data-eng-stat="likes">0</b></div>
+          <div class="eng-tools-row"><span>Total Likes (counted here)</span><b data-eng-stat="likes">0</b></div>
+          <div class="eng-tools-row"><span>Room likes (TikTok's own total)</span><b data-eng-stat="tiktoklikes">–</b></div>
+        </div>
+        <div class="eng-tools-block">
+          <div class="eng-tools-title">📜 Records</div>
+          <p class="eng-tools-note">Every gift, like, share, follow and milestone is saved with the time, the viewer, the game and the audience.</p>
+          <div class="eng-tools-grid">
+            <a class="eng-tools-btn" href="/records.html" target="_blank" rel="noopener" style="text-decoration:none;grid-column:1/-1">📜 Open Records (new tab)</a>
+            <a class="eng-tools-btn" href="/records.html#alerts" target="_blank" rel="noopener" style="text-decoration:none;grid-column:1/-1">🔔 Alert settings: choose which alerts show (new tab)</a>
+          </div>
         </div>
         <div class="eng-tools-block">
           <div class="eng-tools-title">🧪 Test alerts (host only)</div>
@@ -239,13 +250,26 @@
     socket.on("engagement:state", (state) => {
       if (!state || !state.counters) return;
       lastCounters = state.counters;
+      lastCounting = state.counting || null;
       paintStats();
     });
     socket.on("engagement:alert", (alert) => enqueueAlert(alert));
   }
 
   // --------------------------------------------------------- alert queue --
-  const CARD_VISIBLE_MS = 4000;
+  // (update 43) the host's display choices (Records > Alerts): how long, where, how big, confetti / wish line / avatar
+  let CFG = { durationSec: 4, position: "top", scale: 100, confetti: true, showWish: true, showAvatar: true, maxQueue: 25 };
+  function applyDisplay() {
+    const L = alertLayer.style;
+    L.top = L.bottom = L.transform = L.transformOrigin = "";
+    const sc = Math.max(0.5, Math.min(1.6, (Number(CFG.scale) || 100) / 100));
+    if (CFG.position === "bottom") { L.top = "auto"; L.bottom = "calc(18px + env(safe-area-inset-bottom, 0px))"; L.transform = "translateX(-50%) scale(" + sc + ")"; L.transformOrigin = "bottom center"; }
+    else if (CFG.position === "middle") { L.top = "50%"; L.transform = "translate(-50%, -50%) scale(" + sc + ")"; L.transformOrigin = "center center"; }
+    else { L.transform = "translateX(-50%) scale(" + sc + ")"; L.transformOrigin = "top center"; }
+  }
+  if (socket) socket.on("engagement:settings", (st) => { if (st && st.display) { CFG = Object.assign({}, CFG, st.display); applyDisplay(); } });
+  applyDisplay();
+  const CARD_VISIBLE_MS = 4000; // default; the live value is CFG.durationSec
   const CARD_TRANSITION_MS = 240;
   let queue = [];
   let showing = false;
@@ -253,7 +277,8 @@
   function enqueueAlert(alert) {
     if (!alert) return;
     queue.push(alert);
-    if (queue.length > 25) queue = queue.slice(-25); // hard cap so a runaway burst can't grow forever
+    const cap = Math.max(1, Number(CFG.maxQueue) || 25);
+    if (queue.length > cap) queue = queue.slice(-cap); // hard cap so a runaway burst can't grow forever
     processQueue();
   }
 
@@ -268,7 +293,7 @@
     return String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
-  const DEFAULT_ICON = { gift: "🎁", share: "🔥", like_milestone: "👍", room_like_milestone: "🌟", room_share_milestone: "🌟" };
+  const DEFAULT_ICON = { follow: "➕", subscribe: "⭐", gift: "🎁", share: "🔥", like_milestone: "👍", room_like_milestone: "🌟", room_share_milestone: "🌟", gift_milestone: "💰", share_milestone: "📣", room_gift_milestone: "🌟" };
 
   function renderCard(alert) {
     const card = document.createElement("div");
@@ -277,9 +302,9 @@
     card.style.setProperty("--eng-to", alert.gradientTo || "#e0245e");
 
     const icon = alert.icon || DEFAULT_ICON[alert.type] || "🎉";
-    const isRoomAlert = alert.type === "room_like_milestone" || alert.type === "room_share_milestone";
+    const isRoomAlert = alert.type === "room_like_milestone" || alert.type === "room_share_milestone" || alert.type === "room_gift_milestone";
 
-    const avatarHtml = alert.avatarUrl
+    const avatarHtml = !CFG.showAvatar ? "" : alert.avatarUrl
       ? `<img class="eng-mini-avatar" src="${escapeHtml(alert.avatarUrl)}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'eng-mini-avatar',textContent:'👤'}))" />`
       : `<div class="eng-mini-avatar">👤</div>`;
 
@@ -292,13 +317,13 @@
     const bodyHtml = isRoomAlert
       ? `
         <div class="eng-action" style="font-size:14.5px;font-weight:800;">${escapeHtml(alert.message || "")}</div>
-        <div class="eng-wish">${escapeHtml(alert.appreciation || "")}</div>
+        ${CFG.showWish ? `<div class="eng-wish">${escapeHtml(alert.appreciation || "")}</div>` : ""}
         ${statHtml}
       `
       : `
         <div class="eng-row-main">${avatarHtml}<span class="eng-username">@${escapeHtml(alert.username || "viewer")}</span></div>
         <div class="eng-action">${escapeHtml(actionText)}</div>
-        <div class="eng-wish">${escapeHtml(alert.appreciation || "")}</div>
+        ${CFG.showWish ? `<div class="eng-wish">${escapeHtml(alert.appreciation || "")}</div>` : ""}
         ${statHtml}
       `;
 
@@ -309,7 +334,7 @@
 
     alertLayer.appendChild(card);
 
-    if (alert.tier === "confetti") burstConfetti();
+    if (alert.tier === "confetti" && CFG.confetti !== false) burstConfetti();
 
     requestAnimationFrame(() => requestAnimationFrame(() => card.classList.add("eng-show")));
 
@@ -320,7 +345,7 @@
         showing = false;
         processQueue();
       }, CARD_TRANSITION_MS);
-    }, CARD_VISIBLE_MS);
+    }, Math.max(1500, (Number(CFG.durationSec) || CARD_VISIBLE_MS / 1000) * 1000));
   }
 
   // A lightweight, CSS-driven confetti burst — plain positioned <div>s

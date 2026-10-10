@@ -64,6 +64,7 @@ import { mountHomeCards } from "./server/shared/home-cards-store.js";
 import { mountHomeGroups } from "./server/shared/home-groups-store.js";
 import { installTikTokResilience, mountTikTokHealth } from "./server/shared/tiktok-resilience.js";
 import { PlatformHub } from "./server/shared/platform-hub.js";
+import { mountRecords, Records } from "./server/shared/records-store.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -102,11 +103,22 @@ mountTikTokHealth(app);
 // Registered before the games so every game's connect() can already be handed the shared connection.
 PlatformHub.init(app, express);
 
+// Records archive (update 40): every gift, like, share, follow and milestone saved with time, game, host and audience.
+// Page: /records   API: /api/records...   See server/shared/records-store.js.
+mountRecords(app, express);
+Records.setViewerCountSource(() => PlatformHub.viewers);
+
 // Serves /public/index.html at "/", and transparently serves
 // /public/flagle/*, /public/travle/*, /public/crossdle/*, and
 // /public/twistle/* at their matching URLs, plus the shared /shared/*
 // theme + celebration assets every game links to — one static
 // middleware covers the whole platform.
+// Records page (update 40/41): express.static only serves a file under its FULL name (/records.html), so the short
+// address /records needs its own explicit route - without it the browser showed "Cannot GET /records".
+// Registered BEFORE the static middleware and the games; all spellings open the same page.
+const sendRecordsPage = (req, res) => res.sendFile(path.join(__dirname, "public", "records.html"));
+app.get(["/records", "/records/", "/Records", "/record", "/records.htm"], sendRecordsPage);
+
 app.use(express.static(path.join(__dirname, "public")));
 
 // Platform-wide Gift/Like/Share alerts + diagnostics + host Test Event
@@ -114,6 +126,7 @@ app.use(express.static(path.join(__dirname, "public")));
 // (see server/engagement/engagement-hub.js). Initialized before any game
 // registers so Engagement.attach() is ready the instant a game connects.
 Engagement.init(io);
+Engagement.mountApi(app, express); // update 43: GET /api/engagement/counters, POST /api/engagement/reset
 
 // Platform-wide "Color shades" (update 16): remembers each game's 10-step color choices and keeps
 // every screen connected to a game in sync (Socket.IO namespace /shades). See

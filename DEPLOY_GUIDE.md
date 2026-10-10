@@ -203,3 +203,22 @@ usually a quick library update away from being fixed.
 2. Type your TikTok username (start your LIVE first) and press **Connect**. Green = good. Anything else tells you exactly why and what to do.
 3. Open any game: it links to that one connection automatically. No connecting inside games.
 4. Deploy as before (upload the folder to GitHub, Render redeploys). Nothing new to set up.
+
+
+---
+
+## Optional (Update 40) - keep your Records between deployments
+Your Records (every gift, like, milestone...) are saved on the server's disk. Render's free plan wipes that disk at every redeploy, so either:
+1. Open **/records -> Backup & settings -> Backup (JSON)** after each stream and **Restore** it later, **or**
+2. In Render add a **Disk** (Settings -> Disks), mount path `/var/data`, then add the environment variable `RECORDS_DIR` = `/var/data`. Records then survive redeploys by themselves.
+
+
+---
+
+## Optional - word language (update 48)
+
+Nothing extra is needed to use it: open any word game -> Settings -> **Word language**.
+To make Indonesian / Malay accept many more guessed words, either put a text file (one word per line)
+at `data/dictionary-id.txt` / `data/dictionary-ms.txt`, or add the environment variables
+`ID_DICTIONARY_URL` / `MS_DICTIONARY_URL` (a link to a raw text file) in Render -> Environment.
+Details in `CHANGES_UPDATE_48.md`.

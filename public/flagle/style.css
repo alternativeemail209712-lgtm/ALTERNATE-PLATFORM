@@ -726,3 +726,22 @@ input[type="range"].settings-input,
 .avatarChipFallback{
   font-weight:800; color:#fff; text-transform:uppercase; user-select:none; font-size:10px;
 }
+
+/* ---------------- Leaderboard drawer (update 46, matches the word games' tabs + rows) ---------------- */
+.lbTabs{ display:flex; gap:8px; }
+.lbTab{
+  flex:1; padding:9px 10px; border-radius:12px; cursor:pointer;
+  border:2px dashed var(--navy-line); background:var(--navy-deep); color:var(--ink-mid);
+  font-family:var(--font-body); font-weight:700; font-size:14px;
+}
+.lbTab.active{ background:var(--amber); color:#fff; border-style:solid; border-color:var(--amber); }
+.lbList{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
+.lbList li{
+  display:flex; align-items:center; gap:10px;
+  background:var(--navy-deep); border:2px dashed var(--navy-line); border-radius:12px; padding:8px 12px;
+  color:var(--ink-hi); font-weight:600;
+}
+.lbList li.lbEmpty{ color:var(--ink-mid); justify-content:center; text-align:center; font-weight:500; font-size:13px; }
+.lbRank{ color:var(--ink-mid); font-weight:700; min-width:28px; }
+.lbName{ flex:1; word-break:break-word; }
+.lbScore{ font-weight:800; color:var(--wood-deep); }

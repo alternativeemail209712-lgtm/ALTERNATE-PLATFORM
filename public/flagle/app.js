@@ -53,6 +53,7 @@ const settingHoldSeconds = document.getElementById("setting-hold-seconds");
 const settingBlurPx = document.getElementById("setting-blur-px");
 const settingBlurPxValue = document.getElementById("setting-blur-px-value");
 const settingRevealPause = document.getElementById("setting-reveal-pause");
+const settingLbSeconds = document.getElementById("setting-lb-seconds");
 const settingsApplyBtn = document.getElementById("settings-apply");
 const settingsStatusEl = document.getElementById("settings-status");
 const resetSessionScoresBtn = document.getElementById("reset-session-scores");
@@ -65,6 +66,8 @@ const hintBtn = document.getElementById("hint-btn");
 const fullscreenBtn = document.getElementById("fullscreen-btn");
 
 let countdownInterval = null;
+let currentMode = "live"; // update 46
+let latestSessionBoard = []; // update 46: server's session leaderboard (live rounds only)
 
 // ---------- Host settings ----------
 // Local mirror of the session's settings, kept in sync with the server
@@ -76,6 +79,7 @@ let currentSettings = {
   revealHoldSeconds: 10,
   maxBlurPx: 26,
   revealPauseMs: 6000,
+  leaderboardShowSeconds: 4,
 };
 
 function populateSettingsForm(settings) {
@@ -85,6 +89,7 @@ function populateSettingsForm(settings) {
   settingBlurPx.value = currentSettings.maxBlurPx;
   settingBlurPxValue.textContent = currentSettings.maxBlurPx + "px";
   settingRevealPause.value = Math.round(currentSettings.revealPauseMs / 1000);
+  settingLbSeconds.value = currentSettings.leaderboardShowSeconds;
 }
 
 function openSettings() {
@@ -98,6 +103,10 @@ settingsBtn.addEventListener("click", openSettings);
 settingsCloseBtn.addEventListener("click", closeSettings);
 settingsOverlay.addEventListener("click", (e) => {
   if (e.target === settingsOverlay) closeSettings();
+});
+// update 46: leaderboard display time applies immediately (no round restart), like the word games.
+settingLbSeconds.addEventListener("change", () => {
+  socket.emit("host:updateSettings", { leaderboardShowSeconds: Number(settingLbSeconds.value) || 4 });
 });
 settingBlurPx.addEventListener("input", () => {
   settingBlurPxValue.textContent = settingBlurPx.value + "px";
@@ -133,11 +142,14 @@ resetAllTimeScoresBtn.addEventListener("click", () => {
   flagleAllTimeAvatars = {};
   saveFlagleStore();
   saveFlagleAvatarStore();
+  if (!leaderboardOverlay.hidden) renderLeaderboardDrawer();
   settingsStatusEl.textContent = "All-time leaderboard was reset.";
 });
 
 socket.on("leaderboard-update", (list) => {
+  latestSessionBoard = list || [];
   renderLeaderboard(list);
+  if (!leaderboardOverlay.hidden) renderLeaderboardDrawer();
 });
 
 // ---------- All-time leaderboard (persisted client-side, same convention
@@ -251,6 +263,8 @@ startOfflineBtn.addEventListener("click", () => {
 });
 
 socket.on("session-started", ({ mode, label, settings }) => {
+  currentMode = mode;
+  latestSessionBoard = [];
   if (settings) populateSettingsForm(settings);
   setupStatus.textContent = "Ready! Starting the game…";
   setupStatus.className = "setup-status ok";
@@ -323,7 +337,9 @@ socket.on("host-hint", ({ message }) => {
   hintTextEl.classList.add("flash");
 });
 
-socket.on("round-end", ({ countryName, fact, winner, winnerAvatar, points, leaderboard: lb }) => {
+socket.on("round-end", ({ countryName, fact, winner, winnerAvatar, points, mode, leaderboard: lb }) => {
+  if (mode) currentMode = mode;
+  latestSessionBoard = lb || [];
   stopCountdown();
   // Snap instantly to full clarity for the reveal, overriding any
   // in-progress gradual-clear transition so the flag is unmistakably sharp.
@@ -335,7 +351,8 @@ socket.on("round-end", ({ countryName, fact, winner, winnerAvatar, points, leade
   if (winner) {
     showToast(`🎯 ${winner} nailed it — ${countryName} (+${points})`, "win");
     celebrateWinner(winner, winnerAvatar);
-    addFlagleAllTimePoints(winner, points, winnerAvatar);
+    // update 46: like the word games, only LIVE rounds count toward the all-time leaderboard
+    if (currentMode === "live") addFlagleAllTimePoints(winner, points, winnerAvatar);
   } else {
     showToast(`⏱ Time's up — it was ${countryName}`, "reveal");
   }
@@ -344,6 +361,7 @@ socket.on("round-end", ({ countryName, fact, winner, winnerAvatar, points, leade
   hintTextEl.classList.remove("flash");
 
   renderLeaderboard(lb);
+  if (!leaderboardOverlay.hidden) renderLeaderboardDrawer();
   showRoundCelebration(winner, winnerAvatar, countryName);
 });
 
@@ -352,31 +370,94 @@ socket.on("round-end", ({ countryName, fact, winner, winnerAvatar, points, leade
 // answer itself, deliberately in a larger font so it's unmistakable even
 // to someone glancing at a stream overlay. After that window closes, a
 // second floating window shows the all-time top scorer, if there is one.
+function lbSeconds() {
+  return Math.max(1, Number(currentSettings.leaderboardShowSeconds) || 4);
+}
+
+function allTimeBoard() {
+  return Object.entries(flagleAllTime)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([username, points]) => ({ username, points, avatarUrl: flagleAllTimeAvatars[username] || null }));
+}
+
+function boardRows(list) {
+  return list.map((e, i) => ({
+    primary: `#${i + 1}  ${e.username}`,
+    avatarName: e.username,
+    avatarUrl: e.avatarUrl || null,
+    secondary: `${e.points} pt${e.points === 1 ? "" : "s"}`,
+  }));
+}
+
+// Same sequence as the word games: winner -> this session's leaderboard -> all-time leaderboard,
+// each shown for "Show leaderboard for (seconds)". The two boards only follow a LIVE win.
 function showRoundCelebration(winner, winnerAvatar, countryName) {
   if (!window.Celebration) return;
-  window.Celebration.showCard({
+  const ms = lbSeconds() * 1000;
+  const live = currentMode === "live";
+  let chain = window.Celebration.showCard({
     emoji: winner ? "🎯" : "⏱",
     title: winner ? "Round Winner!" : "Round Result",
     rows: [
       winner ? { primary: winner, avatarUrl: winnerAvatar || null } : { primary: "No one got it this round" },
       { primary: countryName, primaryLarge: true },
     ],
-    durationMs: 4000,
-  }).then(showFlagleAllTimeTopScorer);
-}
-
-function showFlagleAllTimeTopScorer() {
-  if (!window.Celebration) return;
-  const entries = Object.entries(flagleAllTime).sort((a, b) => b[1] - a[1]);
-  if (!entries.length) return;
-  const [name, pts] = entries[0];
-  window.Celebration.showCard({
-    emoji: "🏆",
-    title: "All-Time Top Scorer",
-    rows: [{ primary: name, avatarUrl: flagleAllTimeAvatars[name] || null, primaryLarge: true, secondary: `${pts} pt${pts === 1 ? "" : "s"}` }],
-    durationMs: 4000,
+    durationMs: ms,
+  });
+  if (!winner || !live) return;
+  chain = chain.then(() => {
+    if (!latestSessionBoard.length) return;
+    return window.Celebration.showCard({
+      emoji: "🏆", title: "This Session", rows: boardRows(latestSessionBoard), durationMs: ms,
+    });
+  });
+  chain.then(() => {
+    const all = allTimeBoard();
+    if (!all.length) return;
+    return window.Celebration.showCard({
+      emoji: "👑", title: "All-Time Leaderboard", rows: boardRows(all), durationMs: ms,
+    });
   });
 }
+
+// ---------- Leaderboard drawer (🏆 button) ----------
+const leaderboardBtn = document.getElementById("leaderboard-btn");
+const leaderboardOverlay = document.getElementById("leaderboard-overlay");
+const lbTabSession = document.getElementById("lb-tab-session");
+const lbTabAllTime = document.getElementById("lb-tab-alltime");
+const lbListEl = document.getElementById("lb-list");
+const lbNoteEl = document.getElementById("lb-note");
+let activeLbTab = "session";
+
+function renderLeaderboardDrawer() {
+  lbTabSession.classList.toggle("active", activeLbTab === "session");
+  lbTabAllTime.classList.toggle("active", activeLbTab === "alltime");
+  if (currentMode === "test" || currentMode === "offline") {
+    lbListEl.innerHTML = "";
+    lbNoteEl.hidden = false;
+    lbNoteEl.textContent = currentMode === "test"
+      ? "Test Mode scores aren't saved to the leaderboard."
+      : "Offline mode is solo — there's no chat leaderboard here.";
+    return;
+  }
+  lbNoteEl.hidden = true;
+  const list = activeLbTab === "session" ? latestSessionBoard : allTimeBoard();
+  if (!list || list.length === 0) {
+    lbListEl.innerHTML = '<li class="lbEmpty">No scores yet — correct guesses made in Live mode will show up here.</li>';
+    return;
+  }
+  lbListEl.innerHTML = list
+    .map((e, i) =>
+      `<li><span class="lbRank">#${i + 1}</span>${avatarChipHtml(e.username, e.avatarUrl, 22)}<span class="lbName">${escapeHtml(e.username)}</span><span class="lbScore">${e.points}</span></li>`
+    )
+    .join("");
+}
+leaderboardBtn.addEventListener("click", () => { leaderboardOverlay.hidden = false; renderLeaderboardDrawer(); });
+document.getElementById("leaderboard-close").addEventListener("click", () => { leaderboardOverlay.hidden = true; });
+leaderboardOverlay.addEventListener("click", (e) => { if (e.target === leaderboardOverlay) leaderboardOverlay.hidden = true; });
+lbTabSession.addEventListener("click", () => { activeLbTab = "session"; renderLeaderboardDrawer(); });
+lbTabAllTime.addEventListener("click", () => { activeLbTab = "alltime"; renderLeaderboardDrawer(); });
 
 // ---------- Top Fans (Likes and Gifts — two independent sections) ----------
 let latestFanStats = { likes: [], gifts: [] };

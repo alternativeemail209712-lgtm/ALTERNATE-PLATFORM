@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Records - gifts, likes, milestones</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared/theme.css" />
+<script src="/shared/theme.js"></script>
+<style>
+  body{margin:0;min-height:100vh;background:linear-gradient(180deg,var(--theme-bg-top,#FFF3DC),var(--theme-bg,#F5E3C0));font-family:"Quicksand",system-ui,sans-serif;color:var(--theme-ink,#5b4636)}
+  .wrap{max-width:980px;margin:0 auto;padding:14px 14px 60px}
+  header{display:flex;align-items:center;gap:10px;margin:0 0 12px}
+  header h1{flex:1;margin:0;font-size:22px;color:var(--theme-deep,#6b4423)}
+  header a{font-weight:800;color:var(--theme-deep,#6b4423);text-decoration:none;border:2px dashed var(--theme-line,#d9be93);background:var(--theme-card,#fffbf2);border-radius:12px;padding:8px 12px;white-space:nowrap}
+  .card{background:var(--theme-card,#fffbf2);border:2px solid var(--theme-line,#d9be93);border-radius:18px;padding:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><h1>📜 Records</h1><a href="/">← Home</a></header>
+  <div class="card"><div id="rx-root"></div></div>
+</div>
+<script src="/shared/records-ui.js"></script>
+<script>var rx = RecordsUI.mount(document.getElementById("rx-root")); if (/alerts/i.test(location.hash) && rx && rx.setTab) rx.setTab("alerts");</script>
+</body>
+</html>
