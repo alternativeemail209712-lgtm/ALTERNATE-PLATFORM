@@ -221,4 +221,7 @@ Nothing extra is needed to use it: open any word game -> Settings -> **Word lang
 To make Indonesian / Malay accept many more guessed words, either put a text file (one word per line)
 at `data/dictionary-id.txt` / `data/dictionary-ms.txt`, or add the environment variables
 `ID_DICTIONARY_URL` / `MS_DICTIONARY_URL` (a link to a raw text file) in Render -> Environment.
-Details in `CHANGES_UPDATE_48.md`.
+Details in `CHANGES_UPDATE_48.md`. Update 49 only changes word data (`server/shared/lang/`) - deploy exactly as before, no new settings; see `CHANGES_UPDATE_49.md`.
+
+## Update 50 - fuller Indonesian / Malay dictionaries
+See CHANGES_UPDATE_52.md. For the most complete coverage, merge a KBBI / Dewan Bahasa dan Pustaka word list with `node tools/import-wordlist.mjs id|ms yourlist.txt` and deploy the `data/` folder with the rest.

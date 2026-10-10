@@ -1,4 +1,6 @@
 # TikTok LIVE Game Platform
+> **Update 49:** the Indonesian and Malay (Malaysia) word banks are about five times bigger (secret words and accepted guesses) - see `CHANGES_UPDATE_49.md` for the numbers and honest limits.
+>
 > **Update 48:** every word game (all except FLAGLE and TRAVLE) can now be played in **English, Bahasa Indonesia, Bahasa Melayu (Malaysia)** or any of **4 mixes** - Settings -> Word language - see `CHANGES_UPDATE_48.md`.
 > **Update 41:** fixed "Cannot GET /records" - the Records page now opens from `/records`, `/records.html`, every button and every game (explicit server route added).
 > **Update 40:** new **📜 Records** archive - every gift, like, share, follow and milestone is saved with time, viewer, audience, game and host (open `/records`, the 📜 button on HOME, or Settings → Open Records in any game) - plus far more milestone stages with Bronze→Mythic tiers - see `CHANGES_UPDATE_40.md`.
